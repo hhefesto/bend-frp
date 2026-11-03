@@ -1,4 +1,4 @@
-# curva
+# bend-frp
 
 Functional reactive programming in [Bend](https://bend-lang.com), after
 Conal Elliott: a precise meaning first, and an implementation proved to
@@ -6,7 +6,7 @@ agree with it. A web layer on top (as reflex-dom is to reflex) builds pages
 whose state is a behavior of their input events. First user: mugen-web's
 chat, ported from Reflex-DOM.
 
-The name: a behavior is a curve, a value at every moment.
+The name says what it is: FRP for Bend.
 
 Status: design, and three probes in `probe/` showing the approach runs
 (Bend 2.0.39): `Probe.bend` (an event and `stepper`), `Probe2.bend` (two
@@ -22,7 +22,7 @@ page).
 Every operation is defined by what it does to meanings, and every instance
 agrees with the meaning's own (Elliott's type class morphisms):
 
-| curva | its meaning |
+| bend-frp | its meaning |
 |---|---|
 | `B.map(f, b)` | `t => f(b(t))` |
 | `B.pure(x)` | `t => x` |
@@ -37,7 +37,7 @@ agrees with the meaning's own (Elliott's type class morphisms):
 | `B.switcher(b, e)` | `b`, then each behavior `e` delivers, from its occurrence on |
 | `E.snapshot(f, e, b)` | each occurrence `(t, a)` as `(t, f(a, b(t)))` |
 
-What curva leaves out, on purpose:
+What bend-frp leaves out, on purpose:
 
 - **A behavior's "changes" event.** A behavior that varies continuously has
   no discrete changes, so `updated` (Reflex) has no meaning here. A
@@ -61,7 +61,7 @@ What curva leaves out, on purpose:
 
 Bend closures can be called once, and every recursion must end, so a
 behavior cannot be a stored function sampled again and again, nor an
-endless stream. So curva runs a network a step at a time, as Base's `App`
+endless stream. So bend-frp runs a network a step at a time, as Base's `App`
 runs a window:
 
 - A network's running form is a value `Run{init, step}`: its state (Data),
