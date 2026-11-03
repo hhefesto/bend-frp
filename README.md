@@ -8,7 +8,10 @@ chat, ported from Reflex-DOM.
 
 The name: a behavior is a curve, a value at every moment.
 
-Status: design. Nothing here runs yet.
+Status: design, and three probes in `probe/` showing the approach runs
+(Bend 2.0.39): `Probe.bend` (an event and `stepper`), `Probe2.bend` (two
+`accum`s run in sequence over inputs) and `page.html` (that run in a web
+page).
 
 ## The meaning
 
@@ -58,11 +61,20 @@ What curva leaves out, on purpose:
 
 Bend closures can be called once, and every recursion must end, so a
 behavior cannot be a stored function sampled again and again, nor an
-endless stream. curva keeps a network as data plus template functions
-(`~f`), which Bend inlines and lets you call freely, and runs it a step at a
-time: each operation is a small state machine, so a new input occurrence
-costs work in the size of the network, not of the history. The laws above
-are what make that the same thing as the meaning.
+endless stream. So curva runs a network a step at a time, as Base's `App`
+runs a window:
+
+- A network's running form is a value `Run{init, step}`: its state (Data),
+  and a step from an input to the next state and an output. Operations are
+  ordinary defs that build one from others (`then(a, b)` runs `b` on `a`'s
+  outputs; its state holds both states).
+- The runner takes the network as a template (`~r`), as `App.loop` takes an
+  app, so each step builds it afresh and its closures are new each time. A
+  user's own functions are top-level defs, or templates (`~f`), which Bend
+  inlines and lets you call freely.
+- A new input occurrence costs work in the size of the network, not of the
+  history. The laws above are what make that the same thing as the
+  meaning.
 
 ## The web layer
 
@@ -76,5 +88,7 @@ are what make that the same thing as the meaning.
 
 ## Phones
 
-The built site goes in a Capacitor shell: iOS from a Mac with Xcode,
-Android with Gradle (Linux works).
+`bend page.html -o dist` writes a plain web directory: the page and one
+JavaScript file (1.7 KB for `probe/page.html`), no server needed. Capacitor
+takes that directory as its `webDir` and wraps it as an app: iOS from a Mac
+with Xcode, Android with Gradle (Linux works).
