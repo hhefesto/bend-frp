@@ -13,6 +13,9 @@ type Input is Data:
 type Attr is Data:
   # An attribute, or the property of that name for value, checked, disabled.
   Prop{+name: String, +value: String}
+  # An attribute set once, as the element is made: the page's own scripts may
+  # change it afterwards.
+  Once{+name: String, +value: String}
   # When `event` happens here, an Input with this tag.
   On{+event: String, +tag: String}
   # The same, and the browser's default action does not happen.

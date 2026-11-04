@@ -107,26 +107,31 @@ export function mount(App, root, host = (globalThis.bendFrp ??= {})) {
     dom.__keys = keys;
   };
 
+  // Only what the view changed is written: the page's own scripts may keep
+  // attributes of their own on an element, as `class` or `hidden` may change
+  // under them, and a view that says the same thing leaves those alone.
   const setAttrs = (dom, attrs) => {
     const want = new Map();
     each(attrs, (a) => {
       if (a.$ === "Prop") want.set(a.name, a.value);
+      if (a.$ === "Once" && !dom.__attrs) dom.setAttribute(a.name, a.value);
     });
-    for (const name of dom.__attrs ?? []) {
+    const had = dom.__attrs ?? new Map();
+    for (const name of had.keys()) {
       if (want.has(name)) continue;
       if (PROPS.has(name)) dom[name] = name === "value" ? "" : false;
       else dom.removeAttribute(name);
     }
     for (const [name, value] of want) {
       if (name === "checked" || name === "disabled" || name === "selected") {
-        dom[name] = value !== "" && value !== "false";
+        if (had.get(name) !== value) dom[name] = value !== "" && value !== "false";
       } else if (name === "value") {
         if (dom.value !== value) dom.value = value;
-      } else if (dom.getAttribute(name) !== value) {
+      } else if (had.get(name) !== value) {
         dom.setAttribute(name, value);
       }
     }
-    dom.__attrs = [...want.keys()];
+    dom.__attrs = want;
     listen(dom, attrs);
   };
 
