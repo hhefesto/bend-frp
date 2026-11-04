@@ -8,10 +8,10 @@ chat, ported from Reflex-DOM.
 
 The name says what it is: FRP for Bend.
 
-Status: design, and three probes in `probe/` showing the approach runs
-(Bend 2.0.39): `Probe.bend` (an event and `stepper`), `Probe2.bend` (two
-`accum`s run in sequence over inputs) and `page.html` (that run in a web
-page).
+Status: the core is proved (`bend PROOF.bend --verdict` prints ALL PROOFS
+CHECK) and the web layer runs a real page: mugen-web's chat
+([`bend` branch](https://github.com/hhefesto/mugen-web/tree/bend), `web/`). A small
+one is in `examples/todo`.
 
 ## The meaning
 
@@ -50,12 +50,21 @@ What bend-frp leaves out, on purpose:
 
 ## Laws
 
-`LAWS.bend` states the meaning and the agreement; `PROOF.bend` proves them
-(`bend PROOF.bend` prints ALL PROOFS CHECK when every law holds):
+`LAWS.bend` states the laws; `PROOF.bend` proves them (`bend PROOF.bend` prints
+ALL PROOFS CHECK when every law holds; `--verdict` rechecks with BendTT's kernel):
 
-- each instance law above, as an equation between meanings;
-- each operation's running form agrees with its meaning on every finite
-  history of inputs.
+- behaviors: `map` keeps identity and composes, `ap` of two `pure`s is the
+  function's value;
+- events: `map` keeps identity and composes, a filter that keeps all is the event,
+  `never` is `merge`'s identity on both sides;
+- machines agree with the meaning: `E.run` of `lift` is `E.map`, of `accum` is
+  `E.accum`; `then` is composition (`E.run` of `then(a, b)` is `b` over `a`'s
+  outputs, the morphism of the category of machines into functions on events);
+  `each` over an event is the machine over the event spread;
+- `stepper` sampled after all of an event is its last value.
+
+Not stated yet: `merge`'s associativity (it needs the order of times as lemmas
+over `U32`), `switcher`, `snapshot`, `par`.
 
 ## How it runs in Bend
 
@@ -78,13 +87,14 @@ runs a window:
 
 ## The web layer
 
-- A view is data: an HTML tree with keyed nodes, attributes, and handlers
-  named by data rather than closures.
-- An app means `Event<Input> -> Behavior<View>`.
-- A small JavaScript runtime turns DOM events into timed `Input`
-  occurrences, calls the app's step (Bend compiles it with
-  `bend page.html -o dist`), compares the new view with the last and patches
-  the DOM.
+- A view is data (`Web.bend`): an HTML tree with keyed nodes, attributes, and
+  handlers named by data rather than closures. An effect is data too (a request,
+  a timer, a call to the page's own script), and its answer comes back as an
+  input.
+- An app means `Event<Input> -> Behavior<View>`: `init()` and `step(state, input)`.
+- `runtime.js` turns DOM events into timed `Input` occurrences, calls the step
+  (Bend compiles it with `bend page.html -o dist`), compares the new view with
+  the last and patches the DOM, writing only what the view changed.
 
 ## Phones
 
