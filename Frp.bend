@@ -304,3 +304,133 @@ def E.run(~S: Data, ~A: Data, ~B: Data, ~step: S -> A -> S & B, e: Events(A), s:
 # The running form's history: the machine, from its first state, over a list.
 def run(~S: Data, ~A: Data, ~B: Data, ~r: Run<S, A, B>, xs: List<&2, A>) -> List<&2, B>:
   Run.from(~S, ~A, ~B, ~Run.step(S, A, B, r), xs, Run.init(S, A, B, r))
+
+# Both's halves.
+def Both.fst(-S: Data, -T: Data, p: Both<S, T>) -> S:
+  match p:
+    case Both{s, t}:
+      s
+
+def Both.snd(-S: Data, -T: Data, p: Both<S, T>) -> T:
+  match p:
+    case Both{s, t}:
+      t
+
+# Sampling
+# --------
+
+# E.snapshot(f, e, b): each occurrence (t, a) of e as (t, f(a, b(t))). Bend
+# lets a def call a closure once, so the meaning takes the behavior as a
+# template, which it may sample at every occurrence.
+def E.snapshot(~A: Data, ~B: Data, ~C: Data, ~f: A -> B -> C, ~b: Behavior(B), e: Events(A)) -> Events(C):
+  match e:
+    case Nil{}:
+      Nil{}
+    case Con{o, rest}:
+      match o:
+        case Occ{+t, a}:
+          Occ{t, f(a, b(t))} <> E.snapshot(~A, ~B, ~C, ~f, ~b, rest)
+
+# The same against B.stepper(x, d), a behavior described by data: each
+# occurrence (t, a) as (t, f(a, B.stepper(x, d)(t))).
+def E.snapshot.stepper(~A: Data, ~B: Data, ~C: Data, ~f: A -> B -> C, e: Events(A), +x: B, +d: Events(B)) ->
+  Events(C):
+  match e:
+    case Nil{}:
+      Nil{}
+    case Con{o, rest}:
+      match o:
+        case Occ{+t, a}:
+          Occ{t, f(a, B.stepper.at(B, d, t, x))} <> E.snapshot.stepper(~A, ~B, ~C, ~f, rest, x, d)
+
+# One event carrying two: the occurrences to sample at, and a stepper's
+# values. A network has one input event (the page's), so this is how a
+# machine sees both.
+type Side<-A: Data, -B: Data> is Data:
+  Fire{+value: A}
+  Set{+value: B}
+
+def E.fires(-A: Data, -B: Data, i: Events(Side<A, B>)) -> Events(A):
+  match i:
+    case Nil{}:
+      Nil{}
+    case Con{o, rest}:
+      match o:
+        case Occ{t, s}:
+          match s:
+            case Fire{a}:
+              Occ{t, a} <> E.fires(A, B, rest)
+            case Set{v}:
+              E.fires(A, B, rest)
+
+def E.sets(-A: Data, -B: Data, i: Events(Side<A, B>)) -> Events(B):
+  match i:
+    case Nil{}:
+      Nil{}
+    case Con{o, rest}:
+      match o:
+        case Occ{t, s}:
+          match s:
+            case Fire{a}:
+              E.sets(A, B, rest)
+            case Set{v}:
+              Occ{t, v} <> E.sets(A, B, rest)
+
+# The occurrences that carry a value.
+def E.justs(-C: Data, e: Events(Maybe<&2, C>)) -> Events(C):
+  match e:
+    case Nil{}:
+      Nil{}
+    case Con{o, rest}:
+      match o:
+        case Occ{t, m}:
+          match m:
+            case None{}:
+              E.justs(C, rest)
+            case Some{c}:
+              Occ{t, c} <> E.justs(C, rest)
+
+# Whether no occurrence is before t.
+def E.none_before(-A: Data, e: Events(A), +t: U32) -> Bool:
+  match e:
+    case Nil{}:
+      True{}
+    case Con{o, rest}:
+      Bool.not(U32.is_lt(Occ.at(A, o), t)) && E.none_before(A, rest, t)
+
+# Whether every occurrence is after u.
+def E.all_after(-A: Data, e: Events(A), +u: U32) -> Bool:
+  match e:
+    case Nil{}:
+      True{}
+    case Con{o, rest}:
+      U32.is_lt(u, Occ.at(A, o)) && E.all_after(A, rest, u)
+
+# Whether a Side event's order is its times' order where it matters: no value
+# is set before (in time) a sample listed ahead of it, and every sample
+# listed after a value is set comes later in time. (Two time-ordered events
+# merged, samples first at equal times, as E.merge(fires, sets) does.)
+def snap.ok(-A: Data, -B: Data, i: Events(Side<A, B>)) -> Bool:
+  match i:
+    case Nil{}:
+      True{}
+    case Con{o, +rest}:
+      match o:
+        case Occ{+t, s}:
+          match s:
+            case Fire{a}:
+              E.none_before(B, E.sets(A, B, rest), t) && snap.ok(A, B, rest)
+            case Set{v}:
+              E.all_after(A, E.fires(A, B, rest), t) && snap.ok(A, B, rest)
+
+# snap: a stepper's value as the state; a sample is f of its value and the
+# state, a set is no output.
+def snap.step(~A: Data, ~B: Data, ~C: Data, ~f: A -> B -> C, +s: B, i: Side<A, B>) -> B & Maybe<&2, C>:
+  match i:
+    case Fire{a}:
+      (s, Some{f(a, s)})
+    case Set{v}:
+      (v, None{})
+
+def snap(~A: Data, ~B: Data, ~C: Data, ~f: A -> B -> C, +x: B) -> Run<B, Side<A, B>, Maybe<&2, C>>:
+  Run{x, s => i => snap.step(~A, ~B, ~C, ~f, s, i)}

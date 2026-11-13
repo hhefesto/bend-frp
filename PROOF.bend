@@ -4,6 +4,7 @@
 import Base
 import ./Frp.bend as F
 import ./LAWS.bend as Laws
+import ./PROPOSED.bend as Proposed
 
 law cons_cong:
   for -A: Data
@@ -279,3 +280,304 @@ def Laws.stepper_after(A, e, t, x, all):
         case F.Occ{u, y}:
           stepper.if(A, x, F.B.stepper.at(A, rest, t, y), F.E.last(A, rest, y), U32.is_lt(u, t),
                      F.E.all_before(A, rest, t), all, h => Laws.stepper_after(A, rest, t, y, h))
+
+# The proposed laws (PROPOSED.bend)
+# ---------------------------------
+
+# par: the first half
+
+law par.fst.l2:
+  for ~S: Data
+  for ~T: Data
+  for ~A: Data
+  for ~B: Data
+  for ~C: Data
+  for ~sa: S -> A -> S & B
+  for ~sb: T -> A -> T & C
+  for -u: U32
+  for -rest: F.Events(A)
+  for -s2: S
+  for -y: B
+  for q: T & C
+  for ih: @t2:T -> {F.E.map(~F.Both<B, C>, ~B, ~F.Both.fst(B, C),
+                       F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, F.Both{s2, t2}))
+                      == F.E.run(~S, ~A, ~B, ~sa, rest, s2) : F.Events(B)}
+  {F.E.map(~F.Both<B, C>, ~B, ~F.Both.fst(B, C),
+           F.E.push(F.Both<S, T>, F.Both<B, C>, u, F.par.b(S, T, B, C, s2, y, q),
+                    v => F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, v)))
+     == F.Occ{u, y} <> F.E.run(~S, ~A, ~B, ~sa, rest, s2) : F.Events(B)}
+
+def par.fst.l2(S, T, A, B, C, sa, sb, u, rest, s2, y, q, ih):
+  match q:
+    case (t2, z):
+      cons_cong(F.Occ<B>, F.Occ{u, y},
+                F.E.map(~F.Both<B, C>, ~B, ~F.Both.fst(B, C),
+                  F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, F.Both{s2, t2})),
+                F.E.run(~S, ~A, ~B, ~sa, rest, s2),
+                ih(t2))
+
+law par.fst.l1:
+  for ~S: Data
+  for ~T: Data
+  for ~A: Data
+  for ~B: Data
+  for ~C: Data
+  for ~sa: S -> A -> S & B
+  for ~sb: T -> A -> T & C
+  for -u: U32
+  for -rest: F.Events(A)
+  for t: T
+  for x: A
+  for p: S & B
+  for ih: @s2:S -> @t2:T -> {F.E.map(~F.Both<B, C>, ~B, ~F.Both.fst(B, C),
+                                F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, F.Both{s2, t2}))
+                               == F.E.run(~S, ~A, ~B, ~sa, rest, s2) : F.Events(B)}
+  {F.E.map(~F.Both<B, C>, ~B, ~F.Both.fst(B, C),
+           F.E.push(F.Both<S, T>, F.Both<B, C>, u, F.par.a(~S, ~T, ~A, ~B, ~C, ~sb, t, x, p),
+                    v => F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, v)))
+     == F.E.push(S, B, u, p, v => F.E.run(~S, ~A, ~B, ~sa, rest, v)) : F.Events(B)}
+
+def par.fst.l1(S, T, A, B, C, sa, sb, u, rest, t, x, p, ih):
+  match p:
+    case (s2, y):
+      par.fst.l2(S, T, A, B, C, sa, sb, u, rest, s2, y, sb(t, x), ih(s2))
+
+def Proposed.e_run_par_fst(S, T, A, B, C, sa, sb, e, s, t):
+  match e:
+    case Nil{}:
+      {==}
+    case Con{o, rest}:
+      match o:
+        case F.Occ{u, +x}:
+          par.fst.l1(S, T, A, B, C, sa, sb, u, rest, t, x, sa(s, x),
+                     s2 => t2 => Proposed.e_run_par_fst(S, T, A, B, C, sa, sb, rest, s2, t2))
+
+# par: the second half
+
+law par.snd.l2:
+  for ~S: Data
+  for ~T: Data
+  for ~A: Data
+  for ~B: Data
+  for ~C: Data
+  for ~sa: S -> A -> S & B
+  for ~sb: T -> A -> T & C
+  for -u: U32
+  for -rest: F.Events(A)
+  for -s2: S
+  for -y: B
+  for q: T & C
+  for ih: @t2:T -> {F.E.map(~F.Both<B, C>, ~C, ~F.Both.snd(B, C),
+                       F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, F.Both{s2, t2}))
+                      == F.E.run(~T, ~A, ~C, ~sb, rest, t2) : F.Events(C)}
+  {F.E.map(~F.Both<B, C>, ~C, ~F.Both.snd(B, C),
+           F.E.push(F.Both<S, T>, F.Both<B, C>, u, F.par.b(S, T, B, C, s2, y, q),
+                    v => F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, v)))
+     == F.E.push(T, C, u, q, v => F.E.run(~T, ~A, ~C, ~sb, rest, v)) : F.Events(C)}
+
+def par.snd.l2(S, T, A, B, C, sa, sb, u, rest, s2, y, q, ih):
+  match q:
+    case (t2, z):
+      cons_cong(F.Occ<C>, F.Occ{u, z},
+                F.E.map(~F.Both<B, C>, ~C, ~F.Both.snd(B, C),
+                  F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, F.Both{s2, t2})),
+                F.E.run(~T, ~A, ~C, ~sb, rest, t2),
+                ih(t2))
+
+law par.snd.l1:
+  for ~S: Data
+  for ~T: Data
+  for ~A: Data
+  for ~B: Data
+  for ~C: Data
+  for ~sa: S -> A -> S & B
+  for ~sb: T -> A -> T & C
+  for -u: U32
+  for -rest: F.Events(A)
+  for t: T
+  for x: A
+  for p: S & B
+  for ih: @s2:S -> @t2:T -> {F.E.map(~F.Both<B, C>, ~C, ~F.Both.snd(B, C),
+                                F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, F.Both{s2, t2}))
+                               == F.E.run(~T, ~A, ~C, ~sb, rest, t2) : F.Events(C)}
+  {F.E.map(~F.Both<B, C>, ~C, ~F.Both.snd(B, C),
+           F.E.push(F.Both<S, T>, F.Both<B, C>, u, F.par.a(~S, ~T, ~A, ~B, ~C, ~sb, t, x, p),
+                    v => F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, v)))
+     == F.E.push(T, C, u, sb(t, x), v => F.E.run(~T, ~A, ~C, ~sb, rest, v)) : F.Events(C)}
+
+def par.snd.l1(S, T, A, B, C, sa, sb, u, rest, t, x, p, ih):
+  match p:
+    case (s2, y):
+      par.snd.l2(S, T, A, B, C, sa, sb, u, rest, s2, y, sb(t, x), ih(s2))
+
+def Proposed.e_run_par_snd(S, T, A, B, C, sa, sb, e, s, t):
+  match e:
+    case Nil{}:
+      {==}
+    case Con{o, rest}:
+      match o:
+        case F.Occ{u, +x}:
+          par.snd.l1(S, T, A, B, C, sa, sb, u, rest, t, x, sa(s, x),
+                     s2 => t2 => Proposed.e_run_par_snd(S, T, A, B, C, sa, sb, rest, s2, t2))
+
+# snapshot: the data form
+
+def Proposed.snapshot_stepper(A, B, C, f, x, d, e):
+  match e:
+    case Nil{}:
+      {==}
+    case Con{o, rest}:
+      match o:
+        case F.Occ{t, a}:
+          cons_cong(F.Occ<C>, F.Occ{t, f(a, F.B.stepper.at(B, d, t, x))},
+                    F.E.snapshot(~A, ~B, ~C, ~f, ~F.B.stepper(B, x, d), rest),
+                    F.E.snapshot.stepper(~A, ~B, ~C, ~f, rest, x, d),
+                    Proposed.snapshot_stepper(A, B, C, f, x, d, rest))
+
+# snapshot: the machine
+
+# Both halves of a conjunction that holds.
+law and.both:
+  for b: Bool
+  for -c: Bool
+  for -G: Type
+  for h: {(b && c) == True{} : Bool}
+  for k: {b == True{} : Bool} -> {c == True{} : Bool} -> G
+  G
+
+def and.both(b, c, G, h, k):
+  match b:
+    case True{}:
+      k({==}, h)
+    case False{}:
+      clash(G, h)
+
+# A stepper keeps its value while no value is set before t.
+law snap.stay.if:
+  for -A: Data
+  for -x: A
+  for -X: A
+  for b: Bool
+  for -c: Bool
+  for h: {(Bool.not(b) && c) == True{} : Bool}
+  {F.B.stepper.if(A, w => X, x, b) == x : A}
+
+def snap.stay.if(A, x, X, b, c, h):
+  match b:
+    case True{}:
+      clash({F.B.stepper.if(A, w => X, x, True{}) == x : A}, h)
+    case False{}:
+      {==}
+
+law snap.stay:
+  for -B: Data
+  for d: F.Events(B)
+  for +t: U32
+  for -x: B
+  for h: {F.E.none_before(B, d, t) == True{} : Bool}
+  {F.B.stepper.at(B, d, t, x) == x : B}
+
+def snap.stay(B, d, t, x, h):
+  match d:
+    case Nil{}:
+      {==}
+    case Con{o, +rest}:
+      match o:
+        case F.Occ{+u, y}:
+          snap.stay.if(B, x, F.B.stepper.at(B, rest, t, y), U32.is_lt(u, t), F.E.none_before(B, rest, t), h)
+
+# A value set before every sample is the stepper's value at each of them.
+law snap.shift.if:
+  for ~A: Data
+  for ~B: Data
+  for ~C: Data
+  for ~f: A -> B -> C
+  for -t: U32
+  for -a: A
+  for -s: B
+  for -X: B
+  for -L: F.Events(C)
+  for -R: F.Events(C)
+  for b: Bool
+  for -c: Bool
+  for h: {(b && c) == True{} : Bool}
+  for ih: {c == True{} : Bool} -> {L == R : F.Events(C)}
+  {F.Occ{t, f(a, F.B.stepper.if(B, w => X, s, b))} <> L == F.Occ{t, f(a, X)} <> R : F.Events(C)}
+
+def snap.shift.if(A, B, C, f, t, a, s, X, L, R, b, c, h, ih):
+  match b:
+    case True{}:
+      cons_cong(F.Occ<C>, F.Occ{t, f(a, X)}, L, R, ih(h))
+    case False{}:
+      clash({F.Occ{t, f(a, F.B.stepper.if(B, w => X, s, False{}))} <> L == F.Occ{t, f(a, X)} <> R : F.Events(C)}, h)
+
+law snap.shift:
+  for ~A: Data
+  for ~B: Data
+  for ~C: Data
+  for ~f: A -> B -> C
+  for fs: F.Events(A)
+  for +u: U32
+  for -s: B
+  for -v: B
+  for -ds: F.Events(B)
+  for h: {F.E.all_after(A, fs, u) == True{} : Bool}
+  {F.E.snapshot.stepper(~A, ~B, ~C, ~f, fs, s, F.Occ{u, v} <> ds) == F.E.snapshot.stepper(~A, ~B, ~C, ~f, fs, v, ds) : F.Events(C)}
+
+def snap.shift(A, B, C, f, fs, u, s, v, ds, h):
+  match fs:
+    case Nil{}:
+      {==}
+    case Con{o, +rest}:
+      match o:
+        case F.Occ{+t, a}:
+          snap.shift.if(A, B, C, f, t, a, s, F.B.stepper.at(B, ds, t, v),
+                        F.E.snapshot.stepper(~A, ~B, ~C, ~f, rest, s, F.Occ{u, v} <> ds),
+                        F.E.snapshot.stepper(~A, ~B, ~C, ~f, rest, v, ds),
+                        U32.is_lt(u, t), F.E.all_after(A, rest, u), h,
+                        h2 => snap.shift(A, B, C, f, rest, u, s, v, ds, h2))
+
+def Proposed.e_run_snap(A, B, C, f, i, x, ok):
+  match i:
+    case Nil{}:
+      {==}
+    case Con{o, +rest}:
+      match o:
+        case F.Occ{+t, s}:
+          match s:
+            case F.Fire{a}:
+              and.both(F.E.none_before(B, F.E.sets(A, B, rest), t), F.snap.ok(A, B, rest),
+                {F.Occ{t, f(a, x)} <> F.E.justs(C, F.E.run(~B, ~F.Side<A, B>, ~Maybe<&2, C>, ~(+s => i => F.snap.step(~A, ~B, ~C, ~f, s, i)), rest, x))
+                   == F.Occ{t, f(a, F.B.stepper.at(B, F.E.sets(A, B, rest), t, x))}
+                      <> F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.E.sets(A, B, rest)) : F.Events(C)},
+                ok,
+                h1 => h2 =>
+                  Equal.trans(F.Events(C),
+                    F.Occ{t, f(a, x)} <> F.E.justs(C, F.E.run(~B, ~F.Side<A, B>, ~Maybe<&2, C>, ~(+s => i => F.snap.step(~A, ~B, ~C, ~f, s, i)), rest, x)),
+                    F.Occ{t, f(a, x)} <> F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.E.sets(A, B, rest)),
+                    F.Occ{t, f(a, F.B.stepper.at(B, F.E.sets(A, B, rest), t, x))}
+                      <> F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.E.sets(A, B, rest)),
+                    cons_cong(F.Occ<C>, F.Occ{t, f(a, x)},
+                      F.E.justs(C, F.E.run(~B, ~F.Side<A, B>, ~Maybe<&2, C>, ~(+s => i => F.snap.step(~A, ~B, ~C, ~f, s, i)), rest, x)),
+                      F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.E.sets(A, B, rest)),
+                      Proposed.e_run_snap(A, B, C, f, rest, x, h2)),
+                    Equal.cong(B, F.Events(C),
+                      y => F.Occ{t, f(a, y)} <> F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.E.sets(A, B, rest)),
+                      x, F.B.stepper.at(B, F.E.sets(A, B, rest), t, x),
+                      Equal.sym(B, F.B.stepper.at(B, F.E.sets(A, B, rest), t, x), x,
+                        snap.stay(B, F.E.sets(A, B, rest), t, x, h1)))))
+            case F.Set{v}:
+              and.both(F.E.all_after(A, F.E.fires(A, B, rest), t), F.snap.ok(A, B, rest),
+                {F.E.justs(C, F.E.run(~B, ~F.Side<A, B>, ~Maybe<&2, C>, ~(+s => i => F.snap.step(~A, ~B, ~C, ~f, s, i)), rest, v))
+                   == F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.Occ{t, v} <> F.E.sets(A, B, rest)) : F.Events(C)},
+                ok,
+                h1 => h2 =>
+                  Equal.trans(F.Events(C),
+                    F.E.justs(C, F.E.run(~B, ~F.Side<A, B>, ~Maybe<&2, C>, ~(+s => i => F.snap.step(~A, ~B, ~C, ~f, s, i)), rest, v)),
+                    F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), v, F.E.sets(A, B, rest)),
+                    F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.Occ{t, v} <> F.E.sets(A, B, rest)),
+                    Proposed.e_run_snap(A, B, C, f, rest, v, h2),
+                    Equal.sym(F.Events(C),
+                      F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.Occ{t, v} <> F.E.sets(A, B, rest)),
+                      F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), v, F.E.sets(A, B, rest)),
+                      snap.shift(A, B, C, f, F.E.fires(A, B, rest), t, x, v, F.E.sets(A, B, rest), h1))))

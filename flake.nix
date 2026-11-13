@@ -23,6 +23,7 @@
           ./Frp.bend
           ./LAWS.bend
           ./PROOF.bend
+          ./PROPOSED.bend
           ./Web.bend
           ./runtime.js
           ./probe
@@ -91,12 +92,17 @@
           '';
           # every module and example checks
           modules = inSource pkgs "modules" ''
-            for f in Frp.bend Web.bend probe/Probe.bend probe/Probe2.bend examples/todo/App.bend; do
+            for f in Frp.bend Web.bend probe/Probe.bend probe/Probe2.bend probe/Snap.bend examples/todo/App.bend; do
               echo "== $f"
               bend $f --check-only 2>&1 | tee log
               grep -q 'ALL PROOFS CHECK' log
               cat log >> $out
             done
+          '';
+          # snap runs as its meaning says, on a sample input
+          snap = inSource pkgs "snap" ''
+            bend probe/Snap.bend 2>&1 | tee $out
+            grep -qxF "[[10, 25, 37], [10, 25, 37], [1]]" $out
           '';
           inherit (self.packages.${system}) todo probe;
         }

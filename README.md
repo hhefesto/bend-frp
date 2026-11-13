@@ -34,8 +34,9 @@ agrees with the meaning's own (Elliott's type class morphisms):
 | `E.never` | no occurrences |
 | `E.accum(f, x, e)` | each occurrence carries `f` folded over the values so far, from `x` |
 | `B.stepper(x, e)` | `x` before `e`'s first occurrence, then its latest value |
-| `B.switcher(b, e)` | `b`, then each behavior `e` delivers, from its occurrence on |
+| `B.switcher(b, e)` | `b`, then each behavior `e` delivers, from its occurrence on (not written yet) |
 | `E.snapshot(f, e, b)` | each occurrence `(t, a)` as `(t, f(a, b(t)))` |
+| `E.snapshot.stepper(f, e, x, d)` | `E.snapshot(f, e, B.stepper(x, d))`, with the behavior as data |
 
 What bend-frp leaves out, on purpose:
 
@@ -63,8 +64,28 @@ ALL PROOFS CHECK when every law holds; `--verdict` rechecks with BendTT's kernel
   `each` over an event is the machine over the event spread;
 - `stepper` sampled after all of an event is its last value.
 
+Proposed (`PROPOSED.bend`): proved like the rest, waiting for the human to move
+them into `LAWS.bend` (or reword or drop them):
+
+- `par`: each half of its output is that machine alone (`E.run` of `par`,
+  mapped through `Both.fst` or `Both.snd`);
+- `E.snapshot` at `B.stepper(x, d)` is `E.snapshot.stepper(f, e, x, d)`;
+- `snap` agrees with the meaning: over one event of samples (`Fire`) and
+  values (`Set`) whose order `snap.ok` accepts (no value set before a sample
+  listed ahead of it, every sample listed after a value later than it: two
+  time-ordered events merged, samples first at equal times), the samples it
+  answers are the samples snapshotted against the values' stepper.
+
 Not stated yet: `merge`'s associativity (it needs the order of times as lemmas
-over `U32`), `switcher`, `snapshot`, `par`.
+over `U32`), and `switcher`, which is not written yet.
+
+## Building
+
+`nix develop` gives `bend` (2.0.39, the one horas and ana pin), Lean 4.34.0 with
+BendTT for `--verdict`, and node. `nix flake check` runs the gate: the proofs
+with `--verdict`, every module checked, `probe/Snap.bend`'s machine against its
+meaning, and the probe and todo pages bundled (`nix build .#todo` is the
+todo page's web directory).
 
 ## How it runs in Bend
 
