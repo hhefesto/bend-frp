@@ -434,3 +434,82 @@ def snap.step(~A: Data, ~B: Data, ~C: Data, ~f: A -> B -> C, +s: B, i: Side<A, B
 
 def snap(~A: Data, ~B: Data, ~C: Data, ~f: A -> B -> C, +x: B) -> Run<B, Side<A, B>, Maybe<&2, C>>:
   Run{x, s => i => snap.step(~A, ~B, ~C, ~f, s, i)}
+
+# Switching
+# ---------
+
+# B.switcher(fam, k, e): fam(k) until e's first occurrence, then fam of the
+# latest value e delivered (strictly before t, as B.stepper). A behavior is
+# a closure, which an occurrence (data) cannot carry, so e carries keys into
+# a family of behaviors.
+def B.switcher(~K: Data, ~A: Type, ~fam: K -> Behavior(A), +k: K, +e: Events(K)) -> Behavior(A):
+  +t => fam(B.stepper.at(K, e, t, k))(t)
+
+# A family of machines over one state type: machine k starts from init(k)
+# and steps by step(k). Its running form holds its key beside its state,
+# and its step never changes the key.
+def switch.keep(-K: Data, -S: Data, -B: Data, k: K, sy: S & B) -> Both<K, S> & B:
+  (s, y) = sy
+  (Both{k, s}, y)
+
+def switch.run(~K: Data, ~S: Data, ~A: Data, ~B: Data, ~step: K -> S -> A -> S & B, st: Both<K, S>, a: A) ->
+  Both<K, S> & B:
+  match st:
+    case Both{+k, s}:
+      switch.keep(K, S, B, k, step(k, s, a))
+
+def switch.out(-K: Data, -S: Data, -B: Data, p: Both<K, S> & B) -> Both<K, S> & Maybe<&2, B>:
+  (st, y) = p
+  (st, Some{y})
+
+# switch: over one event of inputs (Fire) and keys (Set), the family's
+# machine for the latest key, started afresh at each key.
+def switch.step(~K: Data, ~S: Data, ~A: Data, ~B: Data, ~init: K -> S, ~step: K -> S -> A -> S & B,
+                st: Both<K, S>, i: Side<A, K>) -> Both<K, S> & Maybe<&2, B>:
+  match i:
+    case Fire{a}:
+      switch.out(K, S, B, switch.run(~K, ~S, ~A, ~B, ~step, st, a))
+    case Set{+k}:
+      (Both{k, init(k)}, None{})
+
+def switch(~K: Data, ~S: Data, ~A: Data, ~B: Data, ~init: K -> S, ~step: K -> S -> A -> S & B, +k: K) ->
+  Run<Both<K, S>, Side<A, K>, Maybe<&2, B>>:
+  Run{Both{k, init(k)}, st => i => switch.step(~K, ~S, ~A, ~B, ~init, ~step, st, i)}
+
+# What a switch means. The inputs before the first key, through the machine
+# it is running; then, from each key on, the inputs before the next key,
+# through that key's machine from its start; the outputs in that order.
+def E.upto(-A: Data, -K: Data, i: Events(Side<A, K>)) -> Events(A):
+  match i:
+    case Nil{}:
+      Nil{}
+    case Con{o, rest}:
+      match o:
+        case Occ{t, s}:
+          match s:
+            case Fire{a}:
+              Occ{t, a} <> E.upto(A, K, rest)
+            case Set{k}:
+              Nil{}
+
+def E.switched.after(~K: Data, ~S: Data, ~A: Data, ~B: Data, ~init: K -> S, ~step: K -> S -> A -> S & B,
+                     i: Events(Side<A, K>)) -> Events(B):
+  match i:
+    case Nil{}:
+      Nil{}
+    case Con{o, +rest}:
+      match o:
+        case Occ{t, s}:
+          match s:
+            case Fire{a}:
+              E.switched.after(~K, ~S, ~A, ~B, ~init, ~step, rest)
+            case Set{+k}:
+              List.append(&2, Occ<B>,
+                E.run(~Both<K, S>, ~A, ~B, ~switch.run(~K, ~S, ~A, ~B, ~step), E.upto(A, K, rest), Both{k, init(k)}),
+                E.switched.after(~K, ~S, ~A, ~B, ~init, ~step, rest))
+
+def E.switched(~K: Data, ~S: Data, ~A: Data, ~B: Data, ~init: K -> S, ~step: K -> S -> A -> S & B,
+               +i: Events(Side<A, K>), k: K, s: S) -> Events(B):
+  List.append(&2, Occ<B>,
+    E.run(~Both<K, S>, ~A, ~B, ~switch.run(~K, ~S, ~A, ~B, ~step), E.upto(A, K, i), Both{k, s}),
+    E.switched.after(~K, ~S, ~A, ~B, ~init, ~step, i))

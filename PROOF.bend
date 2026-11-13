@@ -581,3 +581,50 @@ def Proposed.e_run_snap(A, B, C, f, i, x, ok):
                       F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.Occ{t, v} <> F.E.sets(A, B, rest)),
                       F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), v, F.E.sets(A, B, rest)),
                       snap.shift(A, B, C, f, F.E.fires(A, B, rest), t, x, v, F.E.sets(A, B, rest), h1))))
+
+# switch
+
+law switch.fire:
+  for ~K: Data
+  for ~S: Data
+  for ~A: Data
+  for ~B: Data
+  for ~init: K -> S
+  for ~step: K -> S -> A -> S & B
+  for -t: U32
+  for -rest: F.Events(F.Side<A, K>)
+  for -k: K
+  for p: S & B
+  for ih: @s2:S -> {F.E.justs(B, F.E.run(~F.Both<K, S>, ~F.Side<A, K>, ~Maybe<&2, B>,
+                                         ~(st => j => F.switch.step(~K, ~S, ~A, ~B, ~init, ~step, st, j)), rest, F.Both{k, s2}))
+                      == F.E.switched(~K, ~S, ~A, ~B, ~init, ~step, rest, k, s2) : F.Events(B)}
+  {F.E.justs(B, F.E.push(F.Both<K, S>, Maybe<&2, B>, t, F.switch.out(K, S, B, F.switch.keep(K, S, B, k, p)),
+                         v => F.E.run(~F.Both<K, S>, ~F.Side<A, K>, ~Maybe<&2, B>,
+                                      ~(st => j => F.switch.step(~K, ~S, ~A, ~B, ~init, ~step, st, j)), rest, v)))
+     == List.append(&2, F.Occ<B>,
+          F.E.push(F.Both<K, S>, B, t, F.switch.keep(K, S, B, k, p),
+                   v => F.E.run(~F.Both<K, S>, ~A, ~B, ~F.switch.run(~K, ~S, ~A, ~B, ~step), F.E.upto(A, K, rest), v)),
+          F.E.switched.after(~K, ~S, ~A, ~B, ~init, ~step, rest)) : F.Events(B)}
+
+def switch.fire(K, S, A, B, init, step, t, rest, k, p, ih):
+  match p:
+    case (s2, y):
+      cons_cong(F.Occ<B>, F.Occ{t, y},
+                F.E.justs(B, F.E.run(~F.Both<K, S>, ~F.Side<A, K>, ~Maybe<&2, B>,
+                                     ~(st => j => F.switch.step(~K, ~S, ~A, ~B, ~init, ~step, st, j)), rest, F.Both{k, s2})),
+                F.E.switched(~K, ~S, ~A, ~B, ~init, ~step, rest, k, s2),
+                ih(s2))
+
+def Proposed.e_run_switch(K, S, A, B, init, step, i, k, s):
+  match i:
+    case Nil{}:
+      {==}
+    case Con{o, rest}:
+      match o:
+        case F.Occ{t, x}:
+          match x:
+            case F.Fire{a}:
+              switch.fire(K, S, A, B, init, step, t, rest, k, step(k, s, a),
+                          s2 => Proposed.e_run_switch(K, S, A, B, init, step, rest, k, s2))
+            case F.Set{+k2}:
+              Proposed.e_run_switch(K, S, A, B, init, step, rest, k2, init(k2))

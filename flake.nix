@@ -92,7 +92,7 @@
           '';
           # every module and example checks
           modules = inSource pkgs "modules" ''
-            for f in Frp.bend Web.bend probe/Probe.bend probe/Probe2.bend probe/Snap.bend examples/todo/App.bend; do
+            for f in Frp.bend Web.bend probe/Probe.bend probe/Probe2.bend probe/Snap.bend probe/Switch.bend examples/todo/App.bend; do
               echo "== $f"
               bend $f --check-only 2>&1 | tee log
               grep -q 'ALL PROOFS CHECK' log
@@ -103,6 +103,11 @@
           snap = inSource pkgs "snap" ''
             bend probe/Snap.bend 2>&1 | tee $out
             grep -qxF "[[10, 25, 37], [10, 25, 37], [1]]" $out
+          '';
+          # switch runs as its meaning says, on a sample input
+          switch = inSource pkgs "switch" ''
+            bend probe/Switch.bend 2>&1 | tee $out
+            grep -qxF "[[1, 2, 10, 19, 1, 2], [1, 2, 10, 19, 1, 2]]" $out
           '';
           inherit (self.packages.${system}) todo probe;
         }
