@@ -1,0 +1,11 @@
+--- a/Dyn.bend
++++ b/Dyn.bend
+@@ -56,7 +56,7 @@
+     case LT{}:
+       F.Occ{t, F.Both{x, b}} <> lt(Unit{})
+     case EQ{}:
+-      F.Occ{t, F.Both{x, y}} <> eq(Unit{})
++      F.Occ{t, F.Both{x, b}} <> eq(Unit{})
+     case GT{}:
+       F.Occ{u, F.Both{a, y}} <> gt(Unit{})
+ 

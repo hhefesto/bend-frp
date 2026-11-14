@@ -272,3 +272,15 @@ law chain6:
 
 def chain6(T, a, b, c, d, e, f, g, e1, e2, e3, e4, e5, e6):
   Equal.trans(T, a, b, g, e1, chain5(T, b, c, d, e, f, g, e2, e3, e4, e5, e6))
+
+law not.false:
+  for b: Bool
+  for h: {Bool.not(b) == False{} : Bool}
+  {b == True{} : Bool}
+
+def not.false(b, h):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      clash.flip({False{} == True{} : Bool}, h)

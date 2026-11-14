@@ -1,0 +1,11 @@
+--- a/Dyn.bend
++++ b/Dyn.bend
+@@ -130,7 +130,7 @@
+     case Nil{}:
+       ic
+     case Con{F.Occ{+to, Dyn{x2, +ic2}}, rest}:
+-      List.append(&2, F.Occ<A>, Dyn.upto(A, ic, to),
++      List.append(&2, F.Occ<A>, ic,
+         F.Occ{to, Dyn.last_le(A, ic2, to, x2)} <> Dyn.join.go(A, rest, Dyn.after(A, ic2, to)))
+ 
+ def Dyn.join(-A: Data, dd: Dyn<Dyn<A>>) -> Dyn<A>:

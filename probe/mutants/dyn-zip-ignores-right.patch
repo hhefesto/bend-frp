@@ -1,0 +1,11 @@
+--- a/Dyn.bend
++++ b/Dyn.bend
+@@ -58,7 +58,7 @@
+     case EQ{}:
+       F.Occ{t, F.Both{x, y}} <> eq(Unit{})
+     case GT{}:
+-      F.Occ{u, F.Both{a, y}} <> gt(Unit{})
++      F.Occ{u, F.Both{a, b}} <> gt(Unit{})
+ 
+ def Dyn.zip.go(-A: Data, -B: Data, ea: F.Events(A), eb: F.Events(B), +a: A, +b: B) -> F.Events(F.Both<A, B>):
+   match ea eb:

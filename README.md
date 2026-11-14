@@ -42,13 +42,30 @@ agrees with the meaning's own (Elliott's type class morphisms):
 | `E.snapshot(f, e, b)` | each occurrence `(t, a)` as `(t, f(a, b(t)))` |
 | `E.snapshot.stepper(f, e, x, d)` | `E.snapshot(f, e, B.stepper(x, d))`, with the behavior as data |
 
+`Dyn.bend` adds dynamic values (Reflex's `Dynamic`, Elliott's reactive
+value): a `Dyn<A>` is a first value and an event of later values, and it
+means a behavior with the event of its changes:
+
+| bend-frp | its meaning |
+|---|---|
+| `Dyn.current(d)` | `B.stepper(first value, changes)` |
+| `Dyn.updated(d)` | its changes |
+| `Dyn.hold(x, e)` (`holdDyn`) | `x`, then each value `e` delivers |
+| `Dyn.fold(f, x, e)` (`foldDyn`) | at `t`, `f` folded from `x` over `e`'s values before `t`; changes at each of `e`'s occurrences |
+| `Dyn.pure(x)` (`constDyn`) | `x`, never changing |
+| `Dyn.map(f, d)` | current: `t => f(current(d)(t))`; changes when `d` does |
+| `Dyn.zip(da, db)`, `Dyn.zip_with(f, da, db)` (`zipDyn`, `zipDynWith`) | current: the pair of currents, `f` of both; changes when either does, once when both change at one time |
+| `Dyn.join(dd)` | current: `t => current(current(dd)(t))(t)` |
+
+A `Dyn` of functions cannot be built (an event's values are data, and a
+closure is not), so the applicative is `zip` and `zip_with`: Elliott's
+morphism law for it is that current of a zip is the pair of currents.
+
 What bend-frp leaves out, on purpose:
 
 - **A behavior's "changes" event.** A behavior that varies continuously has
-  no discrete changes, so `updated` (Reflex) has no meaning here. A
-  piecewise-constant behavior, built by `stepper`, is a `Reactive<A>` (a value
-  and an event of later values, as in Elliott's *Push-pull functional
-  reactive programming*), and only it has one.
+  no discrete changes, so `updated` (Reflex) has no meaning for it. Only a
+  `Dyn` has one.
 - **Frames and ticks in the interface.** Sampling is the renderer's
   business: a view is sampled when an input arrives, and on display frames
   only while it depends on `B.time`.
@@ -160,7 +177,14 @@ ALL PROOFS CHECK when every law holds; `--verdict` rechecks with BendTT's kernel
   order after them exactly when it was before; `filter` and `justs` keep the
   order; `merge` of two ordered events is ordered; `flat`, which spreads
   values at one time, keeps it;
-- `merge` is associative.
+- `merge` is associative;
+- `Dyn`: current of `hold` is the stepper and its updated is the event; current
+  of `fold` at `t` is the fold of the values before `t`, and its updated is
+  `E.accum`; `pure` is constant and never changes; current of `map` is the
+  map of current, its updated is the map of updated, and `map` keeps identity
+  and composes; current of `zip` is the pair of currents, of `zip_with` `f`
+  of both; current of `join` at `t` is current at `t` of current of the outer
+  at `t`; `join` of `pure` and `join` of `map(pure)` are the `Dyn` itself.
 
 The laws are tested by breaking the library on purpose, one mistake at a time
 (`probe/mutants.sh`): a `map` that drops occurrences or shifts their times, a
@@ -172,12 +196,16 @@ keys, a `snapshot` that samples late, an `accum` that outputs its old state,
 a time order that ignores the fraction, lets a time be before itself, or
 means "different", an event order that wants each time strictly later, a
 `warp` that ignores its clock, a `delay` that runs early, and machines whose
-outputs all happen at time 0. Each one makes `PROOF.bend` fail.
+outputs all happen at time 0; a `Dyn.map` that forgets the changes, a `zip`
+that ignores the right side's change, or keeps only the left at a tie, a
+`join` that switches to a stale value or keeps the old inner's changes, and an
+`updated` that never fires. Each one makes `PROOF.bend` fail.
 
 `PROOF.bend` fills each law from lemmas in `proof/`: `Logic.bend` (absurdity,
 clashes of constructors, the cases of a `Bool`), `Order.bend` (the order of
-times, from the bits of a `U32` up) and `Events.bend` (`merge` and `filter`
-one occurrence at a time, time order, associativity).
+times, from the bits of a `U32` up), `Events.bend` (`merge` and `filter` one
+occurrence at a time, time order, associativity) and `Dyn.bend` (steppers of
+mapped, folded, zipped and joined events).
 
 ## Building
 
@@ -185,7 +213,8 @@ one occurrence at a time, time order, associativity).
 BendTT for `--verdict`, and node. `nix flake check` runs the gate: the proofs
 with `--verdict`, every module checked, the machines of `probe/Snap.bend`
 and `probe/Switch.bend` run against their meanings, Time's arithmetic run
-against worked values (`probe/Time.bend`), the mutants, and the probe and todo
+against worked values (`probe/Time.bend`), `zip` and `join` against their
+meanings (`probe/Dyn.bend`), the mutants, and the probe and todo
 pages bundled (`nix build .#todo` is the todo page's web directory).
 
 ## How it runs in Bend

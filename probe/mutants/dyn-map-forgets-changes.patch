@@ -1,0 +1,11 @@
+--- a/Dyn.bend
++++ b/Dyn.bend
+@@ -45,7 +45,7 @@
+ def Dyn.map(~A: Data, ~B: Data, ~f: A -> B, d: Dyn<A>) -> Dyn<B>:
+   match d:
+     case Dyn{x, e}:
+-      Dyn{f(x), F.E.map(~A, ~B, ~f, e)}
++      Dyn{f(x), Nil{}}
+ 
+ # zipDyn: both values, as a pair; it changes when either does (once, when
+ # both change at one time).

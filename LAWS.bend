@@ -4,6 +4,7 @@
 
 import Base
 import ./Frp.bend as F
+import ./Dyn.bend as D
 
 # Behaviors: instances agree with the meaning's, pointwise
 # --------------------------------------------------------
@@ -503,3 +504,122 @@ law e_merge_assoc:
   for b: F.Events(A)
   for c: F.Events(A)
   {F.E.merge(A, F.E.merge(A, a, b), c) == F.E.merge(A, a, F.E.merge(A, b, c)) : F.Events(A)}
+
+# Dynamic values (Dyn.bend)
+# -------------------------
+
+# A Dyn means a behavior and the event of its changes: current is the stepper
+# of its first value and its changes; updated is its changes. hold (holdDyn)
+# is that pair.
+law dyn_hold_current:
+  for -A: Data
+  for -x: A
+  for -e: F.Events(A)
+  for -t: F.Time
+  {D.Dyn.current(A, D.Dyn.hold(A, x, e))(t) == F.B.stepper(A, x, e)(t) : A}
+
+law dyn_hold_updated:
+  for -A: Data
+  for -x: A
+  for -e: F.Events(A)
+  {D.Dyn.updated(A, D.Dyn.hold(A, x, e)) == e : F.Events(A)}
+
+# fold (foldDyn): at t, f folded over the values e delivered strictly before
+# t; it changes at each of e's occurrences, to the fold so far.
+law dyn_fold_current:
+  for ~A: Data
+  for ~B: Data
+  for ~f: B -> A -> B
+  for e: F.Events(A)
+  for +x: B
+  for +t: F.Time
+  {D.Dyn.current(B, D.Dyn.fold(~A, ~B, ~f, x, e))(t) == F.E.fold(~A, ~B, ~f, F.E.before(A, e, t), x) : B}
+
+law dyn_fold_updated:
+  for ~A: Data
+  for ~B: Data
+  for ~f: B -> A -> B
+  for -e: F.Events(A)
+  for -x: B
+  {D.Dyn.updated(B, D.Dyn.fold(~A, ~B, ~f, x, e)) == F.E.accum(~A, ~B, ~f, e, x) : F.Events(B)}
+
+# pure (constDyn): always x, never changing.
+law dyn_pure_current:
+  for -A: Data
+  for -x: A
+  for -t: F.Time
+  {D.Dyn.current(A, D.Dyn.pure(A, x))(t) == x : A}
+
+law dyn_pure_updated:
+  for -A: Data
+  for -x: A
+  {D.Dyn.updated(A, D.Dyn.pure(A, x)) == F.E.never(A) : F.Events(A)}
+
+# map: current of a map is the map of current, and it changes when d does;
+# the functor laws.
+law dyn_map_current:
+  for ~A: Data
+  for ~B: Data
+  for ~f: A -> B
+  for d: D.Dyn<A>
+  for +t: F.Time
+  {D.Dyn.current(B, D.Dyn.map(~A, ~B, ~f, d))(t) == f(D.Dyn.current(A, d)(t)) : B}
+
+law dyn_map_updated:
+  for ~A: Data
+  for ~B: Data
+  for ~f: A -> B
+  for d: D.Dyn<A>
+  {D.Dyn.updated(B, D.Dyn.map(~A, ~B, ~f, d)) == F.E.map(~A, ~B, ~f, D.Dyn.updated(A, d)) : F.Events(B)}
+
+law dyn_map_id:
+  for ~A: Data
+  for d: D.Dyn<A>
+  {D.Dyn.map(~A, ~A, ~F.ident(A), d) == d : D.Dyn<A>}
+
+law dyn_map_comp:
+  for ~A: Data
+  for ~B: Data
+  for ~C: Data
+  for ~f: A -> B
+  for ~g: B -> C
+  for d: D.Dyn<A>
+  {D.Dyn.map(~B, ~C, ~g, D.Dyn.map(~A, ~B, ~f, d)) == D.Dyn.map(~A, ~C, ~F.comp(~A, ~B, ~C, ~f, ~g), d) : D.Dyn<C>}
+
+# zip (zipDyn): current of a zip is the pair of currents; zip_with
+# (zipDynWith) is f of both.
+law dyn_zip_current:
+  for -A: Data
+  for -B: Data
+  for da: D.Dyn<A>
+  for db: D.Dyn<B>
+  for +t: F.Time
+  {D.Dyn.current(F.Both<A, B>, D.Dyn.zip(A, B, da, db))(t) == F.Both{D.Dyn.current(A, da)(t), D.Dyn.current(B, db)(t)} : F.Both<A, B>}
+
+law dyn_zip_with_current:
+  for ~A: Data
+  for ~B: Data
+  for ~C: Data
+  for ~f: A -> B -> C
+  for da: D.Dyn<A>
+  for db: D.Dyn<B>
+  for +t: F.Time
+  {D.Dyn.current(C, D.Dyn.zip_with(~A, ~B, ~C, ~f, da, db))(t) == f(D.Dyn.current(A, da)(t), D.Dyn.current(B, db)(t)) : C}
+
+# join: at t, the value at t of the Dyn the outer one holds at t; and pure is
+# its unit on both sides (Dyn is a monad).
+law dyn_join_current:
+  for -A: Data
+  for dd: D.Dyn<D.Dyn<A>>
+  for +t: F.Time
+  {D.Dyn.current(A, D.Dyn.join(A, dd))(t) == D.Dyn.current(A, D.Dyn.current(D.Dyn<A>, dd)(t))(t) : A}
+
+law dyn_join_pure:
+  for -A: Data
+  for d: D.Dyn<A>
+  {D.Dyn.join(A, D.Dyn.pure(D.Dyn<A>, d)) == d : D.Dyn<A>}
+
+law dyn_join_map_pure:
+  for ~A: Data
+  for d: D.Dyn<A>
+  {D.Dyn.join(A, D.Dyn.map(~A, ~D.Dyn<A>, ~D.Dyn.pure(A), d)) == d : D.Dyn<A>}

@@ -21,6 +21,7 @@
         root = ./.;
         fileset = nixpkgs.lib.fileset.unions [
           ./Frp.bend
+          ./Dyn.bend
           ./LAWS.bend
           ./PROOF.bend
           ./proof
@@ -92,7 +93,7 @@
           '';
           # every module and example checks
           modules = inSource pkgs "modules" ''
-            for f in Frp.bend Web.bend probe/Probe.bend probe/Probe2.bend probe/Snap.bend probe/Switch.bend probe/Time.bend examples/todo/App.bend; do
+            for f in Frp.bend Dyn.bend Web.bend probe/Probe.bend probe/Probe2.bend probe/Snap.bend probe/Switch.bend probe/Time.bend probe/Dyn.bend examples/todo/App.bend; do
               echo "== $f"
               bend $f --check-only 2>&1 | tee log
               grep -q 'ALL PROOFS CHECK' log
@@ -113,6 +114,11 @@
           time = inSource pkgs "time" ''
             bend probe/Time.bend 2>&1 | tee $out
             grep -qxF "1+2147483648 0+4290672328 8+536870912 2+1073741824 2+4294967196 1+1007169830 2.5 2+3221225472 0+0 0+1073741824 0+4294967294" $out
+          '';
+          # zip and join run as their meanings say, on sample Dyns
+          dyn = inSource pkgs "dyn" ''
+            bend probe/Dyn.bend 2>&1 | tee $out
+            grep -qxF "[[0, 100, 102, 304, 304, 504, 504, 504], [0, 100, 102, 304, 304, 504, 504, 504], [0, 1, 101, 103, 103, 200, 200, 207], [0, 1, 101, 103, 103, 200, 200, 207]]" $out
           '';
           # the laws catch each mistake in probe/mutants/: PROOF.bend fails on every one
           mutants = inSource pkgs "mutants" ''

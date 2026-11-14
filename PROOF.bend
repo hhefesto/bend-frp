@@ -3,10 +3,12 @@
 
 import Base
 import ./Frp.bend as F
+import ./Dyn.bend as D
 import ./LAWS.bend as Laws
 import ./proof/Logic.bend as L
 import ./proof/Order.bend as O
 import ./proof/Events.bend as Ev
+import ./proof/Dyn.bend as Dp
 
 def Laws.b_map_id(A, b, t):
   {==}
@@ -716,3 +718,83 @@ def Laws.e_flat_ordered(A, e, h):
 
 def Laws.e_merge_assoc(A, a, b, c):
   Ev.merge_assoc(A, a, b, c)
+
+# Dynamic values
+# --------------
+
+def Laws.dyn_hold_current(A, x, e, t):
+  {==}
+
+def Laws.dyn_hold_updated(A, x, e):
+  {==}
+
+def Laws.dyn_fold_current(A, B, f, e, x, t):
+  Dp.fold_at(A, B, f, e, t, x)
+
+def Laws.dyn_fold_updated(A, B, f, e, x):
+  {==}
+
+def Laws.dyn_pure_current(A, x, t):
+  {==}
+
+def Laws.dyn_pure_updated(A, x):
+  {==}
+
+def Laws.dyn_map_current(A, B, f, d, t):
+  match d:
+    case D.Dyn{+x, e}:
+      Dp.map_at(A, B, f, e, t, x)
+
+def Laws.dyn_map_updated(A, B, f, d):
+  match d:
+    case D.Dyn{x, e}:
+      {==}
+
+def Laws.dyn_map_id(A, d):
+  match d:
+    case D.Dyn{x, e}:
+      Equal.cong(F.Events(A), D.Dyn<A>, z => D.Dyn{x, z}, F.E.map(~A, ~A, ~F.ident(A), e), e, Laws.e_map_id(A, e))
+
+def Laws.dyn_map_comp(A, B, C, f, g, d):
+  match d:
+    case D.Dyn{x, e}:
+      Equal.cong(F.Events(C), D.Dyn<C>, z => D.Dyn{g(f(x)), z},
+        F.E.map(~B, ~C, ~g, F.E.map(~A, ~B, ~f, e)), F.E.map(~A, ~C, ~F.comp(~A, ~B, ~C, ~f, ~g), e),
+        Laws.e_map_comp(A, B, C, f, g, e))
+
+def Laws.dyn_zip_current(A, B, da, db, t):
+  match da db:
+    case D.Dyn{+a, ea} D.Dyn{+b, eb}:
+      Dp.zip_at(A, B, ea, eb, a, b, t)
+
+def Laws.dyn_zip_with_current(A, B, C, f, da, db, t):
+  match da db:
+    case D.Dyn{+a, +ea} D.Dyn{+b, +eb}:
+      Equal.trans(C,
+        F.B.stepper.at(C, F.E.map(~F.Both<A, B>, ~C, ~D.Dyn.zip_with.app(~A, ~B, ~C, ~f), D.Dyn.zip.go(A, B, ea, eb, a, b)), t,
+          D.Dyn.zip_with.app(~A, ~B, ~C, ~f, F.Both{a, b})),
+        D.Dyn.zip_with.app(~A, ~B, ~C, ~f, F.B.stepper.at(F.Both<A, B>, D.Dyn.zip.go(A, B, ea, eb, a, b), t, F.Both{a, b})),
+        f(F.B.stepper.at(A, ea, t, a), F.B.stepper.at(B, eb, t, b)),
+        Dp.map_at(F.Both<A, B>, C, D.Dyn.zip_with.app(~A, ~B, ~C, ~f), D.Dyn.zip.go(A, B, ea, eb, a, b), t, F.Both{a, b}),
+        Equal.cong(F.Both<A, B>, C, p => D.Dyn.zip_with.app(~A, ~B, ~C, ~f, p),
+          F.B.stepper.at(F.Both<A, B>, D.Dyn.zip.go(A, B, ea, eb, a, b), t, F.Both{a, b}),
+          F.Both{F.B.stepper.at(A, ea, t, a), F.B.stepper.at(B, eb, t, b)},
+          Dp.zip_at(A, B, ea, eb, a, b, t)))
+
+def Laws.dyn_join_current(A, dd, t):
+  match dd:
+    case D.Dyn{d0, ds}:
+      match d0:
+        case D.Dyn{+x0, +ic0}:
+          Dp.join_at(A, ds, x0, ic0, t)
+
+def Laws.dyn_join_pure(A, d):
+  match d:
+    case D.Dyn{x, ic}:
+      {==}
+
+def Laws.dyn_join_map_pure(A, d):
+  match d:
+    case D.Dyn{x, e}:
+      Equal.cong(F.Events(A), D.Dyn<A>, z => D.Dyn{x, z},
+        D.Dyn.join.go(A, F.E.map(~A, ~D.Dyn<A>, ~D.Dyn.pure(A), e), Nil{}), e, Dp.join_pure_at(A, e))

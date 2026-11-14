@@ -1,0 +1,11 @@
+--- a/Dyn.bend
++++ b/Dyn.bend
+@@ -27,7 +27,7 @@
+ def Dyn.updated(-A: Data, d: Dyn<A>) -> F.Events(A):
+   match d:
+     case Dyn{x, e}:
+-      e
++      Nil{}
+ 
+ # holdDyn: x, then each value e delivers.
+ def Dyn.hold(-A: Data, x: A, e: F.Events(A)) -> Dyn<A>:

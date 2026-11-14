@@ -385,6 +385,14 @@ def E.accum(~A: Data, ~B: Data, ~f: B -> A -> B, e: Events(A), +x: B) -> Events(
           +n = f(x, a)
           Occ{t, n} <> E.accum(~A, ~B, ~f, rest, n)
 
+# The values of e folded through f, from x, in order.
+def E.fold(~A: Data, ~B: Data, ~f: B -> A -> B, e: Events(A), x: B) -> B:
+  match e:
+    case Nil{}:
+      x
+    case Con{o, rest}:
+      E.fold(~A, ~B, ~f, rest, f(x, Occ.val(A, o)))
+
 # The machines
 # ------------
 
