@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -244,7 +244,7 @@
+ def E.merge(-A: Data, e1: Events(A), e2: Events(A)) -> Events(A):
+   match e1:
+     case Nil{}:
+-      e2
++      List.tail(&2, Occ<A>, e2)
+     case Con{+x, xs}:
+       E.merge.in(A, x, e2, r => E.merge(A, xs, r))
+ 

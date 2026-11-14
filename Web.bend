@@ -10,6 +10,12 @@ import ./Frp.bend as F
 type Input is Data:
   Input{+at: F.Time, +tag: String, +value: String}
 
+# An input's time, from the last input's and a reading of the page's clock
+# (Time.from_clock): after the last, so inputs come in time order and no two
+# share a time (LAWS.bend, time_after). runtime.js calls it for every input.
+def stamp(+last: F.Time, s: U32, ms: U32, sub: U32) -> F.Time:
+  F.Time.after(last, F.Time.from_clock(s, ms, sub))
+
 type Attr is Data:
   # An attribute, or the property of that name for value, checked, disabled.
   Prop{+name: String, +value: String}

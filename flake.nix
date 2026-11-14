@@ -23,6 +23,7 @@
           ./Frp.bend
           ./LAWS.bend
           ./PROOF.bend
+          ./proof
           ./Web.bend
           ./runtime.js
           ./probe
@@ -91,7 +92,7 @@
           '';
           # every module and example checks
           modules = inSource pkgs "modules" ''
-            for f in Frp.bend Web.bend probe/Probe.bend probe/Probe2.bend probe/Snap.bend probe/Switch.bend examples/todo/App.bend; do
+            for f in Frp.bend Web.bend probe/Probe.bend probe/Probe2.bend probe/Snap.bend probe/Switch.bend probe/Time.bend examples/todo/App.bend; do
               echo "== $f"
               bend $f --check-only 2>&1 | tee log
               grep -q 'ALL PROOFS CHECK' log
@@ -107,6 +108,11 @@
           switch = inSource pkgs "switch" ''
             bend probe/Switch.bend 2>&1 | tee $out
             grep -qxF "[[1, 2, 10, 19, 1, 2], [1, 2, 10, 19, 1, 2]]" $out
+          '';
+          # Time's arithmetic and conversions, run, against values worked out by hand
+          time = inSource pkgs "time" ''
+            bend probe/Time.bend 2>&1 | tee $out
+            grep -qxF "1+2147483648 0+4290672328 8+536870912 2+1073741824 2+4294967196 1+1007169830 2.5 2+3221225472 0+0 0+1073741824 0+4294967294" $out
           '';
           # the laws catch each mistake in probe/mutants/: PROOF.bend fails on every one
           mutants = inSource pkgs "mutants" ''

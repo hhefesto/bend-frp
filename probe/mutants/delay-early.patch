@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -164,7 +164,7 @@
+ 
+ # b, d late: at t, what b was at t less d.
+ def B.delay(-A: Type, +d: Time, b: Behavior(A)) -> Behavior(A):
+-  t => b(Time.sub(t, d))
++  t => b(Time.add(t, d))
+ 
+ # b, k times as fast (k a Time used as a number: Time{2, 0} is twice).
+ def B.faster(-A: Type, +k: Time, b: Behavior(A)) -> Behavior(A):

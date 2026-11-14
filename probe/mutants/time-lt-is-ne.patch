@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -38,7 +38,7 @@
+ 
+ # a is before b. LAWS.bend: a strict total order, as the reals' is.
+ def Time.lt(a: Time, b: Time) -> Bool:
+-  Cmp.is_lt(Time.cmp(a, b))
++  Bool.not(Cmp.is_eq(Time.cmp(a, b)))
+ 
+ # a is not after b.
+ def Time.le(a: Time, b: Time) -> Bool:

@@ -4,18 +4,9 @@
 import Base
 import ./Frp.bend as F
 import ./LAWS.bend as Laws
-
-law cons_cong:
-  for -A: Data
-  for -h: A
-  for -a: List<&2, A>
-  for -b: List<&2, A>
-  for e: {a == b : List<&2, A>}
-  {h <> a == h <> b : List<&2, A>}
-
-def cons_cong(A, h, a, b, e):
-  %e : {h <> a == h <> _ : List<&2, A>}
-  {==}
+import ./proof/Logic.bend as L
+import ./proof/Order.bend as O
+import ./proof/Events.bend as Ev
 
 def Laws.b_map_id(A, b, t):
   {==}
@@ -33,7 +24,7 @@ def Laws.e_map_id(A, e):
     case Con{o, rest}:
       match o:
         case F.Occ{t, x}:
-          cons_cong(F.Occ<A>, F.Occ{t, x}, F.E.map(~A, ~A, ~F.ident(A), rest), rest, Laws.e_map_id(A, rest))
+          L.cons_cong(F.Occ<A>, F.Occ{t, x}, F.E.map(~A, ~A, ~F.ident(A), rest), rest, Laws.e_map_id(A, rest))
 
 def Laws.e_map_comp(A, B, C, f, g, e):
   match e:
@@ -42,7 +33,7 @@ def Laws.e_map_comp(A, B, C, f, g, e):
     case Con{o, rest}:
       match o:
         case F.Occ{t, x}:
-          cons_cong(F.Occ<C>, F.Occ{t, g(f(x))},
+          L.cons_cong(F.Occ<C>, F.Occ{t, g(f(x))},
                     F.E.map(~B, ~C, ~g, F.E.map(~A, ~B, ~f, rest)), F.E.map(~A, ~C, ~F.comp(~A, ~B, ~C, ~f, ~g), rest),
                     Laws.e_map_comp(A, B, C, f, g, rest))
 
@@ -51,7 +42,7 @@ def Laws.e_filter_all(A, e):
     case Nil{}:
       {==}
     case Con{o, rest}:
-      cons_cong(F.Occ<A>, o, F.E.filter(~A, ~F.always(A), rest), rest, Laws.e_filter_all(A, rest))
+      L.cons_cong(F.Occ<A>, o, F.E.filter(~A, ~F.always(A), rest), rest, Laws.e_filter_all(A, rest))
 
 def Laws.e_merge_never_l(A, e):
   {==}
@@ -61,7 +52,7 @@ def Laws.e_merge_never_r(A, e):
     case Nil{}:
       {==}
     case Con{x, xs}:
-      cons_cong(F.Occ<A>, x, F.E.merge(A, xs, Nil{}), xs, Laws.e_merge_never_r(A, xs))
+      L.cons_cong(F.Occ<A>, x, F.E.merge(A, xs, Nil{}), xs, Laws.e_merge_never_r(A, xs))
 
 def Laws.e_run_lift(A, B, f, e, s):
   match e:
@@ -70,7 +61,7 @@ def Laws.e_run_lift(A, B, f, e, s):
     case Con{o, rest}:
       match o:
         case F.Occ{t, x}:
-          cons_cong(F.Occ<B>, F.Occ{t, f(x)},
+          L.cons_cong(F.Occ<B>, F.Occ{t, f(x)},
                     F.E.run(~Unit, ~A, ~B, ~F.lift.step(~A, ~B, ~f), rest, s), F.E.map(~A, ~B, ~f, rest),
                     Laws.e_run_lift(A, B, f, rest, s))
 
@@ -82,7 +73,7 @@ def Laws.e_run_accum(A, B, f, e, x):
       match o:
         case F.Occ{t, a}:
           +n = f(x, a)
-          cons_cong(F.Occ<B>, F.Occ{t, n},
+          L.cons_cong(F.Occ<B>, F.Occ{t, n},
                     F.E.run(~B, ~A, ~B, ~F.accum.step(~A, ~B, ~f), rest, n), F.E.accum(~A, ~B, ~f, rest, n),
                     Laws.e_run_accum(A, B, f, rest, n))
 
@@ -107,7 +98,7 @@ law then.l2:
 def then.l2(S, T, A, B, C, sa, sb, u, rest, s2, q, ih2):
   match q:
     case (t2, z):
-      cons_cong(F.Occ<C>, F.Occ{u, z},
+      L.cons_cong(F.Occ<C>, F.Occ{u, z},
                 F.E.run(~F.Both<S, T>, ~A, ~C, ~F.then.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb), rest, F.Both{s2, t2}),
                 F.E.run(~T, ~B, ~C, ~sb, F.E.run(~S, ~A, ~B, ~sa, rest, s2), t2),
                 ih2(t2))
@@ -183,7 +174,7 @@ def each.push.flat(T, B, C, sb, u, more, tail, k, p, ih):
         F.Occ{u, y} <> F.E.flat(C, F.E.push(T, List<&2, C>, u, F.each.go(~T, ~B, ~C, ~sb, more, t2), k)),
         F.Occ{u, y} <> F.E.run(~T, ~B, ~C, ~sb, F.E.spread(B, u, more, tail), t2),
         each.done.flat(T, C, u, y, F.each.go(~T, ~B, ~C, ~sb, more, t2), k),
-        cons_cong(F.Occ<C>, F.Occ{u, y},
+        L.cons_cong(F.Occ<C>, F.Occ{u, y},
                   F.E.flat(C, F.E.push(T, List<&2, C>, u, F.each.go(~T, ~B, ~C, ~sb, more, t2), k)),
                   F.E.run(~T, ~B, ~C, ~sb, F.E.spread(B, u, more, tail), t2),
                   ih(t2)))
@@ -221,141 +212,20 @@ def Laws.e_run_each(T, B, C, sb, e, t):
                   v => F.E.run(~T, ~List<&2, B>, ~List<&2, C>, ~F.each.step(~T, ~B, ~C, ~sb), rest, v),
                   t2 => Laws.e_run_each(T, B, C, sb, rest, t2))
 
-def disc(b: Bool) -> Type:
-  match b:
-    case True{}:
-      Empty
-    case False{}:
-      Unit
-
-law clash.empty:
-  for h: {False{} == True{} : Bool}
-  Empty
-
-def clash.empty(h):
-  %h : disc(_)
-  Unit{}
-
-law ex_falso:
-  for -G: Type
-  for e: Empty
-  G
-
-def ex_falso(G, e):
-  match e:
-
-law clash:
-  for -G: Type
-  for h: {False{} == True{} : Bool}
-  G
-
-def clash(G, h):
-  ex_falso(G, clash.empty(h))
-
-# The same clash, the other way round.
-law clash.flip.empty:
-  for h: {True{} == False{} : Bool}
-  Empty
-
-def clash.flip.empty(h):
-  %h : disc(Bool.not(_))
-  Unit{}
-
-law clash.flip:
-  for -G: Type
-  for h: {True{} == False{} : Bool}
-  G
-
-def clash.flip(G, h):
-  ex_falso(G, clash.flip.empty(h))
-
-# merge and filter at one step
-# -----------------------------
-
-# merge at two first occurrences, once the order of their times is known.
-law merge.first.if:
-  for -A: Data
-  for b: Bool
-  for -x: F.Occ<A>
-  for -xs: F.Events(A)
-  for -y: F.Occ<A>
-  for -ys: F.Events(A)
-  for h: {b == False{} : Bool}
-  {F.E.merge.pick(A, b, x, y, r => F.E.merge(A, xs, r), ys, j => F.E.merge.in(A, x, ys, r => j(r)))
-     == x <> F.E.merge(A, xs, y <> ys) : F.Events(A)}
-
-def merge.first.if(A, b, x, xs, y, ys, h):
-  match b:
-    case True{}:
-      clash.flip({F.E.merge.pick(A, True{}, x, y, r => F.E.merge(A, xs, r), ys, j => F.E.merge.in(A, x, ys, r => j(r)))
-                    == x <> F.E.merge(A, xs, y <> ys) : F.Events(A)}, h)
-    case False{}:
-      {==}
-
-law merge.later.if:
-  for -A: Data
-  for b: Bool
-  for -x: F.Occ<A>
-  for -xs: F.Events(A)
-  for -y: F.Occ<A>
-  for -ys: F.Events(A)
-  for h: {b == True{} : Bool}
-  {F.E.merge.pick(A, b, x, y, r => F.E.merge(A, xs, r), ys, j => F.E.merge.in(A, x, ys, r => j(r)))
-     == y <> F.E.merge(A, x <> xs, ys) : F.Events(A)}
-
-def merge.later.if(A, b, x, xs, y, ys, h):
-  match b:
-    case True{}:
-      {==}
-    case False{}:
-      clash({F.E.merge.pick(A, False{}, x, y, r => F.E.merge(A, xs, r), ys, j => F.E.merge.in(A, x, ys, r => j(r)))
-               == y <> F.E.merge(A, x <> xs, ys) : F.Events(A)}, h)
-
 def Laws.e_merge_first(A, t, a, xs, u, b, ys, h):
-  merge.first.if(A, F.Time.lt(u, t), F.Occ{t, a}, xs, F.Occ{u, b}, ys, h)
+  Ev.merge_first(A, t, a, xs, u, b, ys, h)
 
 def Laws.e_merge_later(A, t, a, xs, u, b, ys, h):
-  merge.later.if(A, F.Time.lt(u, t), F.Occ{t, a}, xs, F.Occ{u, b}, ys, h)
-
-# filter at one occurrence, once whether its value passes is known.
-law keep.hit:
-  for -A: Data
-  for -o: F.Occ<A>
-  for -rest: F.Events(A)
-  for b: Bool
-  for h: {b == True{} : Bool}
-  {F.E.keep(A, o, rest, b) == o <> rest : F.Events(A)}
-
-def keep.hit(A, o, rest, b, h):
-  match b:
-    case True{}:
-      {==}
-    case False{}:
-      clash({F.E.keep(A, o, rest, False{}) == o <> rest : F.Events(A)}, h)
-
-law keep.miss:
-  for -A: Data
-  for -o: F.Occ<A>
-  for -rest: F.Events(A)
-  for b: Bool
-  for h: {b == False{} : Bool}
-  {F.E.keep(A, o, rest, b) == rest : F.Events(A)}
-
-def keep.miss(A, o, rest, b, h):
-  match b:
-    case True{}:
-      clash.flip({F.E.keep(A, o, rest, True{}) == rest : F.Events(A)}, h)
-    case False{}:
-      {==}
+  Ev.merge_later(A, t, a, xs, u, b, ys, h)
 
 def Laws.e_filter_never(A, p):
   {==}
 
 def Laws.e_filter_keep(A, p, t, a, e, h):
-  keep.hit(A, F.Occ{t, a}, F.E.filter(~A, ~p, e), p(a), h)
+  Ev.keep.hit(A, F.Occ{t, a}, F.E.filter(~A, ~p, e), p(a), h)
 
 def Laws.e_filter_drop(A, p, t, a, e, h):
-  keep.miss(A, F.Occ{t, a}, F.E.filter(~A, ~p, e), p(a), h)
+  Ev.keep.miss(A, F.Occ{t, a}, F.E.filter(~A, ~p, e), p(a), h)
 
 
 law stepper.if:
@@ -374,7 +244,7 @@ def stepper.if(A, x, X, Y, b, c, h, ih):
     case True{}:
       ih(h)
     case False{}:
-      clash({F.B.stepper.if(A, w => X, x, False{}) == Y : A}, h)
+      L.clash({F.B.stepper.if(A, w => X, x, False{}) == Y : A}, h)
 
 def Laws.stepper_after(A, e, t, x, all):
   match e:
@@ -415,7 +285,7 @@ law par.fst.l2:
 def par.fst.l2(S, T, A, B, C, sa, sb, u, rest, s2, y, q, ih):
   match q:
     case (t2, z):
-      cons_cong(F.Occ<B>, F.Occ{u, y},
+      L.cons_cong(F.Occ<B>, F.Occ{u, y},
                 F.E.map(~F.Both<B, C>, ~B, ~F.Both.fst(B, C),
                   F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, F.Both{s2, t2})),
                 F.E.run(~S, ~A, ~B, ~sa, rest, s2),
@@ -483,7 +353,7 @@ law par.snd.l2:
 def par.snd.l2(S, T, A, B, C, sa, sb, u, rest, s2, y, q, ih):
   match q:
     case (t2, z):
-      cons_cong(F.Occ<C>, F.Occ{u, z},
+      L.cons_cong(F.Occ<C>, F.Occ{u, z},
                 F.E.map(~F.Both<B, C>, ~C, ~F.Both.snd(B, C),
                   F.E.run(~F.Both<S, T>, ~A, ~F.Both<B, C>, ~(st => +x => F.par.step(~S, ~T, ~A, ~B, ~C, ~sa, ~sb, st, x)), rest, F.Both{s2, t2})),
                 F.E.run(~T, ~A, ~C, ~sb, rest, t2),
@@ -534,28 +404,12 @@ def Laws.snapshot_stepper(A, B, C, f, x, d, e):
     case Con{o, rest}:
       match o:
         case F.Occ{t, a}:
-          cons_cong(F.Occ<C>, F.Occ{t, f(a, F.B.stepper.at(B, d, t, x))},
+          L.cons_cong(F.Occ<C>, F.Occ{t, f(a, F.B.stepper.at(B, d, t, x))},
                     F.E.snapshot(~A, ~B, ~C, ~f, ~F.B.stepper(B, x, d), rest),
                     F.E.snapshot.stepper(~A, ~B, ~C, ~f, rest, x, d),
                     Laws.snapshot_stepper(A, B, C, f, x, d, rest))
 
 # snapshot: the machine
-
-# Both halves of a conjunction that holds.
-law and.both:
-  for b: Bool
-  for -c: Bool
-  for -G: Type
-  for h: {(b && c) == True{} : Bool}
-  for k: {b == True{} : Bool} -> {c == True{} : Bool} -> G
-  G
-
-def and.both(b, c, G, h, k):
-  match b:
-    case True{}:
-      k({==}, h)
-    case False{}:
-      clash(G, h)
 
 # A stepper keeps its value while no value is set before t.
 law snap.stay.if:
@@ -570,7 +424,7 @@ law snap.stay.if:
 def snap.stay.if(A, x, X, b, c, h):
   match b:
     case True{}:
-      clash({F.B.stepper.if(A, w => X, x, True{}) == x : A}, h)
+      L.clash({F.B.stepper.if(A, w => X, x, True{}) == x : A}, h)
     case False{}:
       {==}
 
@@ -612,9 +466,9 @@ law snap.shift.if:
 def snap.shift.if(A, B, C, f, t, a, s, X, L, R, b, c, h, ih):
   match b:
     case True{}:
-      cons_cong(F.Occ<C>, F.Occ{t, f(a, X)}, L, R, ih(h))
+      L.cons_cong(F.Occ<C>, F.Occ{t, f(a, X)}, L, R, ih(h))
     case False{}:
-      clash({F.Occ{t, f(a, F.B.stepper.if(B, w => X, s, False{}))} <> L == F.Occ{t, f(a, X)} <> R : F.Events(C)}, h)
+      L.clash({F.Occ{t, f(a, F.B.stepper.if(B, w => X, s, False{}))} <> L == F.Occ{t, f(a, X)} <> R : F.Events(C)}, h)
 
 law snap.shift:
   for ~A: Data
@@ -651,7 +505,7 @@ def Laws.e_run_snap(A, B, C, f, i, x, ok):
         case F.Occ{+t, s}:
           match s:
             case F.Fire{a}:
-              and.both(F.E.none_before(B, F.E.sets(A, B, rest), t), F.snap.ok(A, B, rest),
+              L.and.both(F.E.none_before(B, F.E.sets(A, B, rest), t), F.snap.ok(A, B, rest),
                 {F.Occ{t, f(a, x)} <> F.E.justs(C, F.E.run(~B, ~F.Side<A, B>, ~Maybe<&2, C>, ~(+s => i => F.snap.step(~A, ~B, ~C, ~f, s, i)), rest, x))
                    == F.Occ{t, f(a, F.B.stepper.at(B, F.E.sets(A, B, rest), t, x))}
                       <> F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.E.sets(A, B, rest)) : F.Events(C)},
@@ -662,7 +516,7 @@ def Laws.e_run_snap(A, B, C, f, i, x, ok):
                     F.Occ{t, f(a, x)} <> F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.E.sets(A, B, rest)),
                     F.Occ{t, f(a, F.B.stepper.at(B, F.E.sets(A, B, rest), t, x))}
                       <> F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.E.sets(A, B, rest)),
-                    cons_cong(F.Occ<C>, F.Occ{t, f(a, x)},
+                    L.cons_cong(F.Occ<C>, F.Occ{t, f(a, x)},
                       F.E.justs(C, F.E.run(~B, ~F.Side<A, B>, ~Maybe<&2, C>, ~(+s => i => F.snap.step(~A, ~B, ~C, ~f, s, i)), rest, x)),
                       F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.E.sets(A, B, rest)),
                       Laws.e_run_snap(A, B, C, f, rest, x, h2)),
@@ -672,7 +526,7 @@ def Laws.e_run_snap(A, B, C, f, i, x, ok):
                       Equal.sym(B, F.B.stepper.at(B, F.E.sets(A, B, rest), t, x), x,
                         snap.stay(B, F.E.sets(A, B, rest), t, x, h1)))))
             case F.Set{v}:
-              and.both(F.E.all_after(A, F.E.fires(A, B, rest), t), F.snap.ok(A, B, rest),
+              L.and.both(F.E.all_after(A, F.E.fires(A, B, rest), t), F.snap.ok(A, B, rest),
                 {F.E.justs(C, F.E.run(~B, ~F.Side<A, B>, ~Maybe<&2, C>, ~(+s => i => F.snap.step(~A, ~B, ~C, ~f, s, i)), rest, v))
                    == F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.Occ{t, v} <> F.E.sets(A, B, rest)) : F.Events(C)},
                 ok,
@@ -714,7 +568,7 @@ law switch.fire:
 def switch.fire(K, S, A, B, init, step, t, rest, k, p, ih):
   match p:
     case (s2, y):
-      cons_cong(F.Occ<B>, F.Occ{t, y},
+      L.cons_cong(F.Occ<B>, F.Occ{t, y},
                 F.E.justs(B, F.E.run(~F.Both<K, S>, ~F.Side<A, K>, ~Maybe<&2, B>,
                                      ~(st => j => F.switch.step(~K, ~S, ~A, ~B, ~init, ~step, st, j)), rest, F.Both{k, s2})),
                 F.E.switched(~K, ~S, ~A, ~B, ~init, ~step, rest, k, s2),
@@ -796,3 +650,69 @@ def Laws.stepper_before(A, e, t, x):
         case F.Occ{u, y}:
           stepper.before.if(A, x, y, u, F.B.stepper.at(A, rest, t, y), F.E.before(A, rest, t), F.Time.lt(u, t),
                             Laws.stepper_before(A, rest, t, y))
+
+# Time
+# ----
+
+def Laws.time_lt_irrefl(t):
+  O.lt_irrefl(t)
+
+def Laws.time_lt_trans(a, b, c, h1, h2):
+  O.lt_trans(a, b, c, h1, h2)
+
+def Laws.time_lt_total(a, b, h1, h2):
+  O.lt_total(a, b, h1, h2)
+
+def Laws.time_tick(t, h):
+  O.tick_lt(t, h)
+
+def Laws.time_after(last, now, h):
+  O.after_lt(last, now, h)
+
+def Laws.time_after_clock(last, now, h):
+  O.after_now(last, now, h)
+
+def Laws.b_warp_id(A, b, t):
+  {==}
+
+def Laws.b_warp_comp(A, f, g, b, t):
+  {==}
+
+def Laws.b_warp_time(f, t):
+  {==}
+
+def Laws.b_delay_warp(A, d, b, t):
+  {==}
+
+def Laws.b_faster_warp(A, k, b, t):
+  {==}
+
+# Time order
+# ----------
+
+def Laws.e_map_ordered(A, B, f, e):
+  Ev.map_ordered(A, B, f, e)
+
+def Laws.e_filter_ordered(A, p, e, h):
+  Ev.filter_ordered(A, p, e, h)
+
+def Laws.e_merge_ordered(A, e1, e2, h1, h2):
+  Ev.merge_ordered(A, e1, e2, h1, h2)
+
+def Laws.e_accum_ordered(A, B, f, e, x):
+  Ev.accum_ordered(A, B, f, e, x)
+
+def Laws.e_snapshot_ordered(A, B, C, f, b, e):
+  Ev.snapshot_ordered(A, B, C, f, b, e)
+
+def Laws.e_run_ordered(S, A, B, step, e, s):
+  Ev.run_ordered(S, A, B, step, e, s)
+
+def Laws.e_justs_ordered(C, e, h):
+  Ev.justs_ordered(C, e, h)
+
+def Laws.e_flat_ordered(A, e, h):
+  Ev.flat_ordered(A, e, h)
+
+def Laws.e_merge_assoc(A, a, b, c):
+  Ev.merge_assoc(A, a, b, c)

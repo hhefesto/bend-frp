@@ -346,3 +346,160 @@ law e_run_switch:
   {F.E.justs(B, F.E.run(~F.Both<K, S>, ~F.Side<A, K>, ~Maybe<&2, B>,
                         ~(st => j => F.switch.step(~K, ~S, ~A, ~B, ~init, ~step, st, j)), i, F.Both{k, s}))
      == F.E.switched(~K, ~S, ~A, ~B, ~init, ~step, i, k, s) : F.Events(B)}
+
+# Time
+# ----
+
+# Time's order is a strict total order, as the reals' is: no time is before
+# itself, before is transitive, and two times neither before the other are
+# one time.
+law time_lt_irrefl:
+  for +t: F.Time
+  {F.Time.lt(t, t) == False{} : Bool}
+
+law time_lt_trans:
+  for +a: F.Time
+  for +b: F.Time
+  for +c: F.Time
+  for h1: {F.Time.lt(a, b) == True{} : Bool}
+  for h2: {F.Time.lt(b, c) == True{} : Bool}
+  {F.Time.lt(a, c) == True{} : Bool}
+
+law time_lt_total:
+  for +a: F.Time
+  for +b: F.Time
+  for h1: {F.Time.lt(a, b) == False{} : Bool}
+  for h2: {F.Time.lt(b, a) == False{} : Bool}
+  {a == b : F.Time}
+
+# The runtime stamps each input with Time.after(last, clock): the clock's
+# reading when it is past the last input's time, else the next time after
+# that. So inputs come in time order and no two share a time, whatever the
+# clock does (short of the end of time, 136 years on).
+law time_tick:
+  for t: F.Time
+  for h: {F.Time.lt(t, F.Time.end()) == True{} : Bool}
+  {F.Time.lt(t, F.Time.tick(t)) == True{} : Bool}
+
+law time_after:
+  for +last: F.Time
+  for +now: F.Time
+  for h: {F.Time.lt(last, F.Time.end()) == True{} : Bool}
+  {F.Time.lt(last, F.Time.after(last, now)) == True{} : Bool}
+
+law time_after_clock:
+  for +last: F.Time
+  for +now: F.Time
+  for h: {F.Time.lt(last, now) == True{} : Bool}
+  {F.Time.after(last, now) == now : F.Time}
+
+# Elliott's time transformation: warping by the identity changes nothing,
+# two warps are one by the composite clock, time warped is the warp itself,
+# and delay and faster are warps.
+law b_warp_id:
+  for -A: Data
+  for -b: F.Behavior(A)
+  for -t: F.Time
+  {F.B.warp(A, x => x, b)(t) == b(t) : A}
+
+law b_warp_comp:
+  for -A: Data
+  for -f: F.Time -> F.Time
+  for -g: F.Time -> F.Time
+  for -b: F.Behavior(A)
+  for -t: F.Time
+  {F.B.warp(A, f, F.B.warp(A, g, b))(t) == F.B.warp(A, x => g(f(x)), b)(t) : A}
+
+law b_warp_time:
+  for -f: F.Time -> F.Time
+  for -t: F.Time
+  {F.B.warp(F.Time, f, F.B.time())(t) == f(t) : F.Time}
+
+law b_delay_warp:
+  for -A: Data
+  for -d: F.Time
+  for -b: F.Behavior(A)
+  for -t: F.Time
+  {F.B.delay(A, d, b)(t) == F.B.warp(A, x => F.Time.sub(x, d), b)(t) : A}
+
+law b_faster_warp:
+  for -A: Data
+  for -k: F.Time
+  for -b: F.Behavior(A)
+  for -t: F.Time
+  {F.B.faster(A, k, b)(t) == F.B.warp(A, x => F.Time.mul(k, x), b)(t) : A}
+
+# Time order
+# ----------
+
+# An event means occurrences in time order (F.E.ordered), and every operation
+# keeps it: map, accum, snapshot and any machine keep each time, so the order
+# is the one they were given; filter and justs only drop occurrences; merge
+# interleaves two events in order; flat spreads values at one time.
+law e_map_ordered:
+  for ~A: Data
+  for ~B: Data
+  for ~f: A -> B
+  for e: F.Events(A)
+  {F.E.ordered(B, F.E.map(~A, ~B, ~f, e)) == F.E.ordered(A, e) : Bool}
+
+law e_filter_ordered:
+  for ~A: Data
+  for ~p: A -> Bool
+  for e: F.Events(A)
+  for +h: {F.E.ordered(A, e) == True{} : Bool}
+  {F.E.ordered(A, F.E.filter(~A, ~p, e)) == True{} : Bool}
+
+law e_merge_ordered:
+  for -A: Data
+  for e1: F.Events(A)
+  for e2: F.Events(A)
+  for +h1: {F.E.ordered(A, e1) == True{} : Bool}
+  for +h2: {F.E.ordered(A, e2) == True{} : Bool}
+  {F.E.ordered(A, F.E.merge(A, e1, e2)) == True{} : Bool}
+
+law e_accum_ordered:
+  for ~A: Data
+  for ~B: Data
+  for ~f: B -> A -> B
+  for e: F.Events(A)
+  for +x: B
+  {F.E.ordered(B, F.E.accum(~A, ~B, ~f, e, x)) == F.E.ordered(A, e) : Bool}
+
+law e_snapshot_ordered:
+  for ~A: Data
+  for ~B: Data
+  for ~C: Data
+  for ~f: A -> B -> C
+  for ~b: F.Behavior(B)
+  for e: F.Events(A)
+  {F.E.ordered(C, F.E.snapshot(~A, ~B, ~C, ~f, ~b, e)) == F.E.ordered(A, e) : Bool}
+
+law e_run_ordered:
+  for ~S: Data
+  for ~A: Data
+  for ~B: Data
+  for ~step: S -> A -> S & B
+  for e: F.Events(A)
+  for s: S
+  {F.E.ordered(B, F.E.run(~S, ~A, ~B, ~step, e, s)) == F.E.ordered(A, e) : Bool}
+
+law e_justs_ordered:
+  for -C: Data
+  for e: F.Events(Maybe<&2, C>)
+  for h: {F.E.ordered(Maybe<&2, C>, e) == True{} : Bool}
+  {F.E.ordered(C, F.E.justs(C, e)) == True{} : Bool}
+
+law e_flat_ordered:
+  for -A: Data
+  for e: F.Events(List<&2, A>)
+  for h: {F.E.ordered(List<&2, A>, e) == True{} : Bool}
+  {F.E.ordered(A, F.E.flat(A, e)) == True{} : Bool}
+
+# merge is associative: three events merge into one, however grouped.
+law e_merge_assoc:
+  for -A: Data
+  for a: F.Events(A)
+  for b: F.Events(A)
+  for c: F.Events(A)
+  {F.E.merge(A, F.E.merge(A, a, b), c) == F.E.merge(A, a, F.E.merge(A, b, c)) : F.Events(A)}

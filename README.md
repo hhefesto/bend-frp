@@ -29,6 +29,9 @@ agrees with the meaning's own (Elliott's type class morphisms):
 | `B.pure(x)` | `t => x` |
 | `B.ap(bf, bx)` | `t => bf(t)(bx(t))` |
 | `B.time` | `t => t` |
+| `B.warp(f, b)` | `t => b(f(t))`: `b` on another clock (Elliott's time transformation) |
+| `B.delay(d, b)`, `B.faster(k, b)` | `B.warp` by `t => t - d`, by `t => k * t` |
+| `B.seconds` | `t =>` the seconds of `t` as an `F32`, for arithmetic |
 | `E.map(f, e)` | each occurrence's value through `f` |
 | `E.filter(p, e)` | the occurrences whose value passes `p` |
 | `E.merge(e1, e2)` | both, in time order (`e1` first at equal times) |
@@ -81,13 +84,31 @@ Bend has no 64-bit float. `F32` (24-bit mantissa) is coarser than a
 millisecond once a page has been open 4.6 hours, and its operations are
 primitives whose laws cannot be proved. So bend-frp holds `Time` as 64-bit
 fixed-point seconds, `Time{sec, frac}`, the fraction in units of 2^-32 s.
-That meets 1 to 3: the meaning is still the reals; programs only compare
-(`Time.lt`, `Time.le`), add (`Time.add`) and sample; and it resolves 0.23 ns
-for 136 years. It also orders exactly, by a plain definition, so the laws
-about time are proved rather than assumed. The runtime stamps each input with
-the clock and never gives two inputs the same time. Of 4, it has addition so
-far; scaling and a conversion to `F32` for continuous arithmetic are still to
-come. It needs no infinities: `never` is the event with no occurrences.
+It does what the `Double` did, all four:
+
+1. The meaning is still the reals, and programs only compare (`Time.lt`,
+   `Time.le`), do arithmetic and sample.
+2. The runtime still picks the times to sample at.
+3. It resolves 0.23 ns for 136 years, and the runtime never gives two inputs
+   one time: `Web.bend`'s `stamp` passes the clock's reading through
+   `Time.after(last, now)`, which is the reading when it is past the last
+   input's time and the next time after that one otherwise, and the laws
+   prove it after the last (`time_after`).
+4. It is a number: `Time.add`, `Time.sub`, `Time.mul` (two times as numbers:
+   `Time{2, 2^31}` is 2.5), `Time.scale` (by a whole number), and to and from
+   numbers: `Time.to_f32` (for the sine of time; within a microsecond for the
+   first 16 s, a millisecond for 4.6 hours), `Time.from_f32`, `Time.from_ms`
+   and `Time.from_clock` (whole seconds, milliseconds and the part of one, as
+   `runtime.js` reads `performance.now()`). For behaviors: `B.warp` (Elliott's
+   time transformation), `B.delay`, `B.faster` and `B.seconds`. It needs no
+   infinities: `never` is the event with no occurrences.
+
+Unlike a `Double` it orders exactly, by a plain definition on Base's 32-bit
+words, so the order's laws are proved: it is a strict total order, as the
+reals' is. The arithmetic is checked against values worked out by hand
+(`probe/Time.bend`, the flake's `time` check), not proved: a proof would go
+through 32-bit multiplication and `F32` primitives, which Bend's checker does
+not reduce on unknown values. It wraps past 2^32 s.
 
 ## Laws
 
@@ -126,26 +147,45 @@ ALL PROOFS CHECK when every law holds; `--verdict` rechecks with BendTT's kernel
   values (`Set`) whose order `snap.ok` accepts (no value set before a sample
   listed ahead of it, every sample listed after a value later than it: two
   time-ordered events merged, samples first at equal times), the samples it
-  answers are the samples snapshotted against the values' stepper.
+  answers are the samples snapshotted against the values' stepper;
+- time: `Time.lt` is a strict total order (no time is before itself, before
+  is transitive, and two times neither before the other are one time);
+  `Time.tick(t)` is after `t`; `Time.after(last, now)` is after `last`, and is
+  `now` when `now` is past `last` (short of the end of time, 136 years on);
+- time transformation (Elliott's): warping by the identity changes nothing,
+  two warps are one by the composite clock, `time` warped is the warp, and
+  `delay` and `faster` are warps;
+- every operation keeps events in time order (`E.ordered`): `map`, `accum`,
+  `snapshot` and any machine (`E.run`) keep every time, so an event is in
+  order after them exactly when it was before; `filter` and `justs` keep the
+  order; `merge` of two ordered events is ordered; `flat`, which spreads
+  values at one time, keeps it;
+- `merge` is associative.
 
-The laws are tested by breaking `Frp.bend` on purpose, one mistake at a time
+The laws are tested by breaking the library on purpose, one mistake at a time
 (`probe/mutants.sh`): a `map` that drops occurrences or shifts their times, a
-`merge` that ignores time or puts `e2` first at equal times, a `filter` that
+`merge` that ignores time, puts `e2` first at equal times, puts the later
+first, or drops an occurrence when its left side is empty, a `filter` that
 keeps everything or inverts its test, `time` off by one, `ap` sampling its
 function at time 0, an inclusive `stepper`, a `switcher` that ignores its
-keys, a `snapshot` that samples late, an `accum` that outputs its old state.
-Each one makes `PROOF.bend` fail.
+keys, a `snapshot` that samples late, an `accum` that outputs its old state,
+a time order that ignores the fraction, lets a time be before itself, or
+means "different", an event order that wants each time strictly later, a
+`warp` that ignores its clock, a `delay` that runs early, and machines whose
+outputs all happen at time 0. Each one makes `PROOF.bend` fail.
 
-Not stated yet: `merge`'s associativity, and that the operations keep events
-in time order. Both need the order of times as lemmas over `Time` (a pair of
-Base's `U32`, 32-bit words with an inductive compare, so they can be proved).
+`PROOF.bend` fills each law from lemmas in `proof/`: `Logic.bend` (absurdity,
+clashes of constructors, the cases of a `Bool`), `Order.bend` (the order of
+times, from the bits of a `U32` up) and `Events.bend` (`merge` and `filter`
+one occurrence at a time, time order, associativity).
 
 ## Building
 
 `nix develop` gives `bend` (2.0.39, the one horas and ana pin), Lean 4.34.0 with
 BendTT for `--verdict`, and node. `nix flake check` runs the gate: the proofs
 with `--verdict`, every module checked, the machines of `probe/Snap.bend`
-and `probe/Switch.bend` run against their meanings, and the probe and todo
+and `probe/Switch.bend` run against their meanings, Time's arithmetic run
+against worked values (`probe/Time.bend`), the mutants, and the probe and todo
 pages bundled (`nix build .#todo` is the todo page's web directory).
 
 ## How it runs in Bend
@@ -174,7 +214,8 @@ runs a window:
   a timer, a call to the page's own script), and its answer comes back as an
   input.
 - An app means `Event<Input> -> Behavior<View>`: `init()` and `step(state, input)`.
-- `runtime.js` turns DOM events into timed `Input` occurrences, calls the step
+- `runtime.js` turns DOM events into timed `Input` occurrences (their times
+  from `Web.bend`'s `stamp`), calls the step
   (Bend compiles it with `bend page.html -o dist`), compares the new view with
   the last and patches the DOM, writing only what the view changed.
 

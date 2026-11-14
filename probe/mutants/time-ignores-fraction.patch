@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -34,7 +34,7 @@
+     case Time{as, af}:
+       match b:
+         case Time{bs, bf}:
+-          Time.lex(U32.cmp(as, bs), U32.cmp(af, bf))
++          Time.lex(U32.cmp(as, bs), EQ{})
+ 
+ # a is before b. LAWS.bend: a strict total order, as the reals' is.
+ def Time.lt(a: Time, b: Time) -> Bool:

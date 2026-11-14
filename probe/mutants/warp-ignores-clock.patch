@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -160,7 +160,7 @@
+ # Elliott's time transformation: b on another clock, f(t) when the world's
+ # is t.
+ def B.warp(-A: Type, f: Time -> Time, b: Behavior(A)) -> Behavior(A):
+-  t => b(f(t))
++  t => b(t)
+ 
+ # b, d late: at t, what b was at t less d.
+ def B.delay(-A: Type, +d: Time, b: Behavior(A)) -> Behavior(A):

@@ -5,6 +5,7 @@
 //
 // Values cross as Bend's JS target has them: a constructor is
 // {$: "Name", field: value}, a String is a JS string, a pair {fst, snd}.
+import W from "./Web.bend";
 
 const each = (xs, f) => {
   for (; xs.$ === "Con"; xs = xs.tail) f(xs.head);
@@ -37,15 +38,16 @@ export function mount(App, root, host = (globalThis.bendFrp ??= {})) {
   const queue = [];
   let busy = false;
 
-  // An input's time, as Frp.bend's Time holds it (whole seconds, and the
-  // fraction in 2^-32 s), and always after the last one: no two inputs share
-  // a time.
-  let last = -1n;
+  // An input's time: the clock, read here and made a Time by Web.bend's
+  // stamp, which keeps it after the last input's: no two inputs share a time.
+  let last = { $: "Time", sec: 0, frac: 0 };
   const stamp = () => {
-    let t = BigInt(Math.floor(performance.now() * 4294967.296));
-    if (t <= last) t = last + 1n;
-    last = t;
-    return { $: "Time", sec: Number(t >> 32n), frac: Number(t & 0xffffffffn) };
+    const now = performance.now();
+    const s = Math.floor(now / 1000);
+    const ms = Math.floor(now - s * 1000);
+    const sub = Math.floor((now - s * 1000 - ms) * 4294967296);
+    last = W.stamp(last, s >>> 0, Math.min(ms, 999), sub >>> 0);
+    return last;
   };
 
   const fire = (tag, value) => {

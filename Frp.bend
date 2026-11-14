@@ -18,13 +18,27 @@ import Base
 type Time is Data:
   Time{+sec: U32, +frac: U32}
 
-# a is before b.
-def Time.lt(a: Time, b: Time) -> Bool:
+# The order of two times, as a Cmp: the whole seconds decide, and the
+# fractions when the seconds are equal.
+def Time.lex(hi: Cmp, lo: Cmp) -> Cmp:
+  match hi:
+    case LT{}:
+      LT{}
+    case EQ{}:
+      lo
+    case GT{}:
+      GT{}
+
+def Time.cmp(a: Time, b: Time) -> Cmp:
   match a:
-    case Time{+as, af}:
+    case Time{as, af}:
       match b:
-        case Time{+bs, bf}:
-          U32.is_lt(as, bs) || (U32.is_eq(as, bs) && U32.is_lt(af, bf))
+        case Time{bs, bf}:
+          Time.lex(U32.cmp(as, bs), U32.cmp(af, bf))
+
+# a is before b. LAWS.bend: a strict total order, as the reals' is.
+def Time.lt(a: Time, b: Time) -> Bool:
+  Cmp.is_lt(Time.cmp(a, b))
 
 # a is not after b.
 def Time.le(a: Time, b: Time) -> Bool:
@@ -43,6 +57,111 @@ def Time.add(a: Time, b: Time) -> Time:
 # n whole seconds.
 def Time.secs(n: U32) -> Time:
   Time{n, 0}
+
+# The time from t to u (u less t), as a duration: the fractions borrow. It
+# wraps when u is before t.
+def Time.sub(u: Time, t: Time) -> Time:
+  match u:
+    case Time{us, +uf}:
+      match t:
+        case Time{ts, +tf}:
+          Time{U32.sub(U32.sub(us, ts), Bool.to_u32(U32.is_lt(uf, tf))), U32.sub(uf, tf)}
+
+# The 64-bit product of two words, as its high and low words (from 16-bit
+# halves, so no partial product overflows).
+def Time.wide(+a: U32, +b: U32) -> U32 & U32:
+  +a0 = (a .&. 65535 : U32)
+  +a1 = (a >> 16n : U32)
+  +b0 = (b .&. 65535 : U32)
+  +b1 = (b >> 16n : U32)
+  +p00 = (a0 * b0 : U32)
+  +p01 = (a0 * b1 : U32)
+  +p10 = (a1 * b0 : U32)
+  +mid = ((p00 >> 16n) + ((p10 .&. 65535) + (p01 .&. 65535)) : U32)
+  (((a1 * b1) + ((p10 >> 16n) + ((p01 >> 16n) + (mid >> 16n))) : U32), ((p00 .&. 65535) .|. (mid << 16n) : U32))
+
+def Time.mul.fin(s: U32, h1: U32, +l1: U32, h2: U32, l2: U32, h3: U32) -> Time:
+  +f1 = U32.add(l1, l2)
+  +f = U32.add(f1, h3)
+  Time{(s + (h1 + (h2 + (Bool.to_u32(U32.is_lt(f1, l1)) + Bool.to_u32(U32.is_lt(f, f1))))) : U32), f}
+
+def Time.mul.sum(s: U32, x: U32 & U32, y: U32 & U32, z: U32 & U32) -> Time:
+  (h1, l1) = x
+  (h2, l2) = y
+  (h3, l3) = z
+  Time.mul.fin(s, h1, l1, h2, l2, h3)
+
+# The product of two times as numbers (a duration scaled by a factor that is
+# itself a Time: Time{2, 2147483648} is 2.5), rounded down to 2^-32 s. It
+# wraps past 2^32 s.
+def Time.mul(a: Time, b: Time) -> Time:
+  match a:
+    case Time{+as, +af}:
+      match b:
+        case Time{+bs, +bf}:
+          Time.mul.sum(U32.mul(as, bs), Time.wide(as, bf), Time.wide(af, bs), Time.wide(af, bf))
+
+# t scaled by a whole number k.
+def Time.scale(k: U32, t: Time) -> Time:
+  Time.mul(Time{k, 0}, t)
+
+# Time as a number
+# ----------------
+
+# Seconds as an F32, for arithmetic that wants a number (the sine of time, a
+# fraction of a duration). F32 keeps 24 bits: within a microsecond for the
+# first 16 s, a millisecond for 4.6 hours. Order and sums stay with Time.
+def Time.to_f32(t: Time) -> F32:
+  match t:
+    case Time{s, f}:
+      F32.add(U32.to_f32(s), F32.div(U32.to_f32(f), 4294967296.0))
+
+# x seconds (0 <= x < 2^32), to the 2^-32 s at or below.
+def Time.from_f32(+x: F32) -> Time:
+  +w = F32.floor(x)
+  Time{F32.to_u32(w), F32.to_u32(F32.mul(F32.sub(x, w), 4294967296.0))}
+
+# ms milliseconds, to the 2^-32 s at or below: r ms past the second is
+# r * 2^32 / 1000 = r * 4294967 + r * 296 / 1000 in 2^-32 s.
+def Time.from_ms(+ms: U32) -> Time:
+  +r = U32.mod(ms, 1000)
+  Time{U32.div(ms, 1000), ((r * 4294967) + ((r * 296) / 1000) : U32)}
+
+# A reading of a clock, as runtime.js takes it from performance.now(): whole
+# seconds, the milliseconds after them (under 1000), and the part of a
+# millisecond after those in 2^-32 ms.
+def Time.from_clock(s: U32, ms: U32, sub: U32) -> Time:
+  Time.add(Time.add(Time{s, 0}, Time.from_ms(ms)), Time{0, U32.div(sub, 1000)})
+
+# The last time there is: 2^32 - 2^-32 s, 136 years on.
+def Time.end() -> Time:
+  Time{4294967295, 4294967295}
+
+# The next time after t, 2^-32 s on.
+def Time.tick.if(top: Bool, +s: U32, +f: U32) -> Time:
+  match top:
+    case True{}:
+      Time{U32.inc(s), 0}
+    case False{}:
+      Time{s, U32.inc(f)}
+
+def Time.tick(t: Time) -> Time:
+  match t:
+    case Time{+s, +f}:
+      Time.tick.if(U32.is_eq(f, 4294967295), s, f)
+
+# The time an input gets: the clock's reading, or the next time after the last
+# input's when the clock has not moved past it, so that inputs come in time
+# order and no two share a time (LAWS.bend).
+def Time.after.pick(later: Bool, +last: Time, now: Time) -> Time:
+  match later:
+    case True{}:
+      now
+    case False{}:
+      Time.tick(last)
+
+def Time.after(+last: Time, +now: Time) -> Time:
+  Time.after.pick(Time.lt(last, now), last, now)
 
 # Behavior<A> means a function of time.
 def Behavior(-A: Type) -> Type:
@@ -67,6 +186,23 @@ def B.map(-A: Type, -B: Type, f: A -> B, b: Behavior(A)) -> Behavior(B):
 
 def B.ap(-A: Type, -B: Type, bf: Behavior(A -> B), bx: Behavior(A)) -> Behavior(B):
   +t => bf(t)(bx(t))
+
+# Elliott's time transformation: b on another clock, f(t) when the world's
+# is t.
+def B.warp(-A: Type, f: Time -> Time, b: Behavior(A)) -> Behavior(A):
+  t => b(f(t))
+
+# b, d late: at t, what b was at t less d.
+def B.delay(-A: Type, +d: Time, b: Behavior(A)) -> Behavior(A):
+  t => b(Time.sub(t, d))
+
+# b, k times as fast (k a Time used as a number: Time{2, 0} is twice).
+def B.faster(-A: Type, +k: Time, b: Behavior(A)) -> Behavior(A):
+  t => b(Time.mul(k, t))
+
+# Time as a number of seconds, for arithmetic (see Time.to_f32).
+def B.seconds() -> Behavior(F32):
+  t => Time.to_f32(t)
 
 def ident(-A: Data, x: A) -> A:
   x
@@ -141,6 +277,29 @@ def E.merge(-A: Data, e1: Events(A), e2: Events(A)) -> Events(A):
       e2
     case Con{+x, xs}:
       E.merge.in(A, x, e2, r => E.merge(A, xs, r))
+
+# Time order
+# ----------
+
+# Events(A) means occurrences in time order; these say it of a list. e is in
+# time order from t: each occurrence at or after the one before it, and the
+# first at or after t.
+def E.ordered_from(-A: Data, e: Events(A), +t: Time) -> Bool:
+  match e:
+    case Nil{}:
+      True{}
+    case Con{o, rest}:
+      match o:
+        case Occ{+u, x}:
+          Time.le(t, u) && E.ordered_from(A, rest, u)
+
+# e is in time order. Every operation keeps it (LAWS.bend).
+def E.ordered(-A: Data, e: Events(A)) -> Bool:
+  match e:
+    case Nil{}:
+      True{}
+    case Con{o, rest}:
+      E.ordered_from(A, rest, Occ.at(A, o))
 
 # B.stepper at t: x before e's first occurrence, then its latest value
 # strictly before t.

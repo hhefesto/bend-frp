@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -473,7 +473,7 @@
+ # A machine over an event: the same occurrences, their values through it.
+ def E.push(-S: Data, -B: Data, +t: Time, sy: S & B, k: S -> Events(B)) -> Events(B):
+   (s, y) = sy
+-  Occ{t, y} <> k(s)
++  Occ{Time{0, 0}, y} <> k(s)
+ 
+ def E.run(~S: Data, ~A: Data, ~B: Data, ~step: S -> A -> S & B, e: Events(A), s: S) -> Events(B):
+   match e:
