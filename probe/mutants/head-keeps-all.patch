@@ -1,0 +1,11 @@
+--- a/Ops.bend
++++ b/Ops.bend
+@@ -69,7 +69,7 @@
+     case Nil{}:
+       Nil{}
+     case Con{o, rest}:
+-      o <> Nil{}
++      o <> rest
+ 
+ def E.tail(-A: Data, e: F.Events(A)) -> F.Events(A):
+   match e:

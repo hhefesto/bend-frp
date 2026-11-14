@@ -1,0 +1,11 @@
+--- a/Ops.bend
++++ b/Ops.bend
+@@ -12,7 +12,7 @@
+     case LT{}:
+       F.Occ{t, a} <> lt(Unit{})
+     case EQ{}:
+-      F.Occ{t, f(a, b)} <> eq(Unit{})
++      F.Occ{t, a} <> eq(Unit{})
+     case GT{}:
+       F.Occ{u, b} <> gt(Unit{})
+ 

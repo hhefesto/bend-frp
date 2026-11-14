@@ -5,6 +5,7 @@
 import Base
 import ./Frp.bend as F
 import ./Dyn.bend as D
+import ./Ops.bend as Op
 
 # Behaviors: instances agree with the meaning's, pointwise
 # --------------------------------------------------------
@@ -623,3 +624,259 @@ law dyn_join_map_pure:
   for ~A: Data
   for d: D.Dyn<A>
   {D.Dyn.join(A, D.Dyn.map(~A, ~D.Dyn<A>, ~D.Dyn.pure(A), d)) == d : D.Dyn<A>}
+
+# More event combinators (Ops.bend)
+# ---------------------------------
+
+# merge_with (mergeWith): both in time order, and f of the two values where
+# both occur at one time. These pin it down. leftmost keeps e1's value.
+law e_merge_with_never_l:
+  for ~A: Data
+  for ~f: A -> A -> A
+  for -e: F.Events(A)
+  {Op.E.merge_with(~A, ~f, F.E.never(A), e) == e : F.Events(A)}
+
+law e_merge_with_never_r:
+  for ~A: Data
+  for ~f: A -> A -> A
+  for e: F.Events(A)
+  {Op.E.merge_with(~A, ~f, e, F.E.never(A)) == e : F.Events(A)}
+
+law e_merge_with_first:
+  for ~A: Data
+  for ~f: A -> A -> A
+  for +t: F.Time
+  for -a: A
+  for -xs: F.Events(A)
+  for +u: F.Time
+  for -b: A
+  for -ys: F.Events(A)
+  for h: {F.Time.lt(t, u) == True{} : Bool}
+  {Op.E.merge_with(~A, ~f, F.Occ{t, a} <> xs, F.Occ{u, b} <> ys) == F.Occ{t, a} <> Op.E.merge_with(~A, ~f, xs, F.Occ{u, b} <> ys) : F.Events(A)}
+
+law e_merge_with_later:
+  for ~A: Data
+  for ~f: A -> A -> A
+  for +t: F.Time
+  for -a: A
+  for -xs: F.Events(A)
+  for +u: F.Time
+  for -b: A
+  for -ys: F.Events(A)
+  for h: {F.Time.lt(u, t) == True{} : Bool}
+  {Op.E.merge_with(~A, ~f, F.Occ{t, a} <> xs, F.Occ{u, b} <> ys) == F.Occ{u, b} <> Op.E.merge_with(~A, ~f, F.Occ{t, a} <> xs, ys) : F.Events(A)}
+
+law e_merge_with_same:
+  for ~A: Data
+  for ~f: A -> A -> A
+  for +t: F.Time
+  for -a: A
+  for -xs: F.Events(A)
+  for -b: A
+  for -ys: F.Events(A)
+  {Op.E.merge_with(~A, ~f, F.Occ{t, a} <> xs, F.Occ{t, b} <> ys) == F.Occ{t, f(a, b)} <> Op.E.merge_with(~A, ~f, xs, ys) : F.Events(A)}
+
+law e_leftmost_same:
+  for ~A: Data
+  for +t: F.Time
+  for -a: A
+  for -xs: F.Events(A)
+  for -b: A
+  for -ys: F.Events(A)
+  {Op.E.leftmost(~A, F.Occ{t, a} <> xs, F.Occ{t, b} <> ys) == F.Occ{t, a} <> Op.E.leftmost(~A, xs, ys) : F.Events(A)}
+
+# difference: e1's occurrences at times e2 does not occur.
+law e_difference_never:
+  for -A: Data
+  for -B: Data
+  for e: F.Events(A)
+  {Op.E.difference(A, B, e, F.E.never(B)) == e : F.Events(A)}
+
+law e_difference_keep:
+  for -A: Data
+  for -B: Data
+  for +t: F.Time
+  for -a: A
+  for -e1: F.Events(A)
+  for +e2: F.Events(B)
+  for h: {Op.E.occurs(B, e2, t) == False{} : Bool}
+  {Op.E.difference(A, B, F.Occ{t, a} <> e1, e2) == F.Occ{t, a} <> Op.E.difference(A, B, e1, e2) : F.Events(A)}
+
+law e_difference_drop:
+  for -A: Data
+  for -B: Data
+  for +t: F.Time
+  for -a: A
+  for -e1: F.Events(A)
+  for +e2: F.Events(B)
+  for h: {Op.E.occurs(B, e2, t) == True{} : Bool}
+  {Op.E.difference(A, B, F.Occ{t, a} <> e1, e2) == Op.E.difference(A, B, e1, e2) : F.Events(A)}
+
+# gate: e's occurrences at times b is True, in time order.
+law e_gate_keep:
+  for ~A: Data
+  for ~b: F.Behavior(Bool)
+  for +t: F.Time
+  for +a: A
+  for -e: F.Events(A)
+  for h: {b(t) == True{} : Bool}
+  {Op.E.gate(~A, ~b, F.Occ{t, a} <> e) == F.Occ{t, a} <> Op.E.gate(~A, ~b, e) : F.Events(A)}
+
+law e_gate_drop:
+  for ~A: Data
+  for ~b: F.Behavior(Bool)
+  for +t: F.Time
+  for +a: A
+  for -e: F.Events(A)
+  for h: {b(t) == False{} : Bool}
+  {Op.E.gate(~A, ~b, F.Occ{t, a} <> e) == Op.E.gate(~A, ~b, e) : F.Events(A)}
+
+law e_gate_ordered:
+  for ~A: Data
+  for ~b: F.Behavior(Bool)
+  for +e: F.Events(A)
+  for h: {F.E.ordered(A, e) == True{} : Bool}
+  {F.E.ordered(A, Op.E.gate(~A, ~b, e)) == True{} : Bool}
+
+# head (headE), tail (tailE), take, drop: the first occurrence and the
+# rest; the first n and the rest; each in time order.
+law e_head_tail:
+  for -A: Data
+  for e: F.Events(A)
+  {List.append(&2, F.Occ<A>, Op.E.head(A, e), Op.E.tail(A, e)) == e : F.Events(A)}
+
+law e_take_drop:
+  for -A: Data
+  for e: F.Events(A)
+  for n: Nat
+  {List.append(&2, F.Occ<A>, Op.E.take(A, e, n), Op.E.drop(A, e, n)) == e : F.Events(A)}
+
+law e_head_take:
+  for -A: Data
+  for e: F.Events(A)
+  {Op.E.head(A, e) == Op.E.take(A, e, 1n) : F.Events(A)}
+
+law e_take_ordered:
+  for -A: Data
+  for e: F.Events(A)
+  for n: Nat
+  for h: {F.E.ordered(A, e) == True{} : Bool}
+  {F.E.ordered(A, Op.E.take(A, e, n)) == True{} : Bool}
+
+law e_drop_ordered:
+  for -A: Data
+  for e: F.Events(A)
+  for n: Nat
+  for h: {F.E.ordered(A, e) == True{} : Bool}
+  {F.E.ordered(A, Op.E.drop(A, e, n)) == True{} : Bool}
+
+# select (fan's selector): the values of the occurrences with key k, in
+# place; fan spreads keyed values in time order.
+law e_select_hit:
+  for ~K: Data
+  for ~A: Data
+  for ~same: K -> K -> Bool
+  for +t: F.Time
+  for +k2: K
+  for +a: A
+  for -e: F.Events(F.Both<K, A>)
+  for +k: K
+  for h: {same(k2, k) == True{} : Bool}
+  {Op.E.select(~K, ~A, ~same, F.Occ{t, F.Both{k2, a}} <> e, k) == F.Occ{t, a} <> Op.E.select(~K, ~A, ~same, e, k) : F.Events(A)}
+
+law e_select_miss:
+  for ~K: Data
+  for ~A: Data
+  for ~same: K -> K -> Bool
+  for +t: F.Time
+  for +k2: K
+  for +a: A
+  for -e: F.Events(F.Both<K, A>)
+  for +k: K
+  for h: {same(k2, k) == False{} : Bool}
+  {Op.E.select(~K, ~A, ~same, F.Occ{t, F.Both{k2, a}} <> e, k) == Op.E.select(~K, ~A, ~same, e, k) : F.Events(A)}
+
+law e_select_ordered:
+  for ~K: Data
+  for ~A: Data
+  for ~same: K -> K -> Bool
+  for e: F.Events(F.Both<K, A>)
+  for +k: K
+  for +h: {F.E.ordered(F.Both<K, A>, e) == True{} : Bool}
+  {F.E.ordered(A, Op.E.select(~K, ~A, ~same, e, k)) == True{} : Bool}
+
+law e_fan_ordered:
+  for -K: Data
+  for -A: Data
+  for e: F.Events(List<&2, F.Both<K, A>>)
+  for h: {F.E.ordered(List<&2, F.Both<K, A>>, e) == True{} : Bool}
+  {F.E.ordered(F.Both<K, A>, Op.E.fan(K, A, e)) == True{} : Bool}
+
+# delay: each occurrence d later.
+law e_delay_never:
+  for -A: Data
+  for -d: F.Time
+  {Op.E.delay(A, d, F.E.never(A)) == F.E.never(A) : F.Events(A)}
+
+law e_delay_occ:
+  for -A: Data
+  for -d: F.Time
+  for -t: F.Time
+  for -a: A
+  for -e: F.Events(A)
+  {Op.E.delay(A, d, F.Occ{t, a} <> e) == F.Occ{F.Time.add(t, d), a} <> Op.E.delay(A, d, e) : F.Events(A)}
+
+# debounce: an occurrence fires d later when the next does not come before
+# then, and is dropped when it does.
+law e_debounce_never:
+  for -A: Data
+  for -d: F.Time
+  {Op.E.debounce(A, d, F.E.never(A)) == F.E.never(A) : F.Events(A)}
+
+law e_debounce_keep:
+  for -A: Data
+  for +d: F.Time
+  for +t: F.Time
+  for +a: A
+  for +e: F.Events(A)
+  for h: {Op.E.quiet(A, e, F.Time.add(t, d)) == True{} : Bool}
+  {Op.E.debounce(A, d, F.Occ{t, a} <> e) == F.Occ{F.Time.add(t, d), a} <> Op.E.debounce(A, d, e) : F.Events(A)}
+
+law e_debounce_drop:
+  for -A: Data
+  for +d: F.Time
+  for +t: F.Time
+  for +a: A
+  for +e: F.Events(A)
+  for h: {Op.E.quiet(A, e, F.Time.add(t, d)) == False{} : Bool}
+  {Op.E.debounce(A, d, F.Occ{t, a} <> e) == Op.E.debounce(A, d, e) : F.Events(A)}
+
+# throttle: the first occurrence passes, and then each at least d after the
+# last that passed; the others are dropped.
+law e_throttle_first:
+  for -A: Data
+  for -d: F.Time
+  for -t: F.Time
+  for -a: A
+  for -e: F.Events(A)
+  {Op.E.throttle(A, d, F.Occ{t, a} <> e) == F.Occ{t, a} <> Op.E.throttle.from(A, e, d, F.Time.add(t, d)) : F.Events(A)}
+
+law e_throttle_open:
+  for -A: Data
+  for +d: F.Time
+  for +from: F.Time
+  for +t: F.Time
+  for +a: A
+  for +e: F.Events(A)
+  for h: {F.Time.le(from, t) == True{} : Bool}
+  {Op.E.throttle.from(A, F.Occ{t, a} <> e, d, from) == F.Occ{t, a} <> Op.E.throttle.from(A, e, d, F.Time.add(t, d)) : F.Events(A)}
+
+law e_throttle_shut:
+  for -A: Data
+  for +d: F.Time
+  for +from: F.Time
+  for +t: F.Time
+  for +a: A
+  for +e: F.Events(A)
+  for h: {F.Time.le(from, t) == False{} : Bool}
+  {Op.E.throttle.from(A, F.Occ{t, a} <> e, d, from) == Op.E.throttle.from(A, e, d, from) : F.Events(A)}

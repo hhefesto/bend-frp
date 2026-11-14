@@ -61,6 +61,24 @@ A `Dyn` of functions cannot be built (an event's values are data, and a
 closure is not), so the applicative is `zip` and `zip_with`: Elliott's
 morphism law for it is that current of a zip is the pair of currents.
 
+`Ops.bend` adds reflex's other event combinators:
+
+| bend-frp | its meaning |
+|---|---|
+| `E.merge_with(f, e1, e2)` (`mergeWith`) | both in time order; where both occur at one time, one occurrence of `f` of the two values |
+| `E.leftmost(e1, e2)` | `merge_with`, keeping `e1`'s value |
+| `E.difference(e1, e2)` | `e1`'s occurrences at times `e2` does not occur |
+| `E.gate(b, e)` | `e`'s occurrences at times `b` is `True` |
+| `E.head(e)`, `E.tail(e)` (`headE`, `tailE`) | the first occurrence; the others |
+| `E.take(e, n)`, `E.drop(e, n)` | the first `n`; the others |
+| `E.fan(e)`, `E.select(same, e, k)` | keyed values spread one per key; the values at key `k`, in place |
+| `E.delay(d, e)` | each occurrence `d` later |
+| `E.debounce(d, e)` | an occurrence, `d` later, if the next does not come before then |
+| `E.throttle(d, e)` | the first occurrence, then each at least `d` after the last that passed |
+
+`throttle` here passes the leading occurrence and drops the rest of a burst;
+reflex's also fires the burst's last at the end of the window.
+
 What bend-frp leaves out, on purpose:
 
 - **A behavior's "changes" event.** A behavior that varies continuously has
@@ -184,7 +202,19 @@ ALL PROOFS CHECK when every law holds; `--verdict` rechecks with BendTT's kernel
   map of current, its updated is the map of updated, and `map` keeps identity
   and composes; current of `zip` is the pair of currents, of `zip_with` `f`
   of both; current of `join` at `t` is current at `t` of current of the outer
-  at `t`; `join` of `pure` and `join` of `map(pure)` are the `Dyn` itself.
+  at `t`; `join` of `pure` and `join` of `map(pure)` are the `Dyn` itself;
+- the combinators of `Ops.bend`, each pinned down occurrence by occurrence:
+  `merge_with` against `never` on both sides and at its two first
+  occurrences (the earlier first, `f` of both at one time), `leftmost` at one
+  time; `difference` against `never`, keeping an occurrence `e2` has none at
+  and dropping one it has; `gate` keeping where `b` is `True` and dropping
+  where it is `False`; `head` then `tail`, and `take` then `drop`, are the
+  event, and `head` is `take` of 1; `select` keeping the occurrences at its
+  key and dropping the others; `delay` at `never` and at one occurrence;
+  `debounce` keeping an occurrence the next does not follow within `d`, and
+  dropping one it does; `throttle` passing the first, then passing an
+  occurrence at or after the time it waits for and dropping one before it;
+  and `gate`, `take`, `drop`, `select` and `fan` keep time order.
 
 The laws are tested by breaking the library on purpose, one mistake at a time
 (`probe/mutants.sh`): a `map` that drops occurrences or shifts their times, a
@@ -198,14 +228,19 @@ means "different", an event order that wants each time strictly later, a
 `warp` that ignores its clock, a `delay` that runs early, and machines whose
 outputs all happen at time 0; a `Dyn.map` that forgets the changes, a `zip`
 that ignores the right side's change, or keeps only the left at a tie, a
-`join` that switches to a stale value or keeps the old inner's changes, and an
-`updated` that never fires. Each one makes `PROOF.bend` fail.
+`join` that switches to a stale value or keeps the old inner's changes, an
+`updated` that never fires; a `merge_with` that keeps one value at a tie, a
+`difference` that keeps everything, a `gate` turned round, a `head` that keeps
+the rest, a `take` that skips, a `select` that ignores the key, a `delay`
+that does not wait, a `debounce` that keeps every occurrence, and a
+`throttle` that lets all through. Each one makes `PROOF.bend` fail.
 
 `PROOF.bend` fills each law from lemmas in `proof/`: `Logic.bend` (absurdity,
 clashes of constructors, the cases of a `Bool`), `Order.bend` (the order of
 times, from the bits of a `U32` up), `Events.bend` (`merge` and `filter` one
 occurrence at a time, time order, associativity) and `Dyn.bend` (steppers of
-mapped, folded, zipped and joined events).
+mapped, folded, zipped and joined events) and `Ops.bend` (`merge_with`, `gate`,
+`throttle` at one occurrence, `take` then `drop`, `select` in time order).
 
 ## Building
 
@@ -214,7 +249,8 @@ BendTT for `--verdict`, and node. `nix flake check` runs the gate: the proofs
 with `--verdict`, every module checked, the machines of `probe/Snap.bend`
 and `probe/Switch.bend` run against their meanings, Time's arithmetic run
 against worked values (`probe/Time.bend`), `zip` and `join` against their
-meanings (`probe/Dyn.bend`), the mutants, and the probe and todo
+meanings (`probe/Dyn.bend`), `Ops.bend`'s combinators against worked values
+(`probe/Ops.bend`), the mutants, and the probe and todo
 pages bundled (`nix build .#todo` is the todo page's web directory).
 
 ## How it runs in Bend

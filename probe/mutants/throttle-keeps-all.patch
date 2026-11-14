@@ -1,0 +1,11 @@
+--- a/Ops.bend
++++ b/Ops.bend
+@@ -151,7 +151,7 @@
+     case Nil{}:
+       Nil{}
+     case Con{F.Occ{+t, +a}, +rest}:
+-      E.throttle.pick(A, F.Time.le(from, t), t, a,
++      E.throttle.pick(A, True{}, t, a,
+         w => E.throttle.from(A, rest, d, F.Time.add(t, d)),
+         w => E.throttle.from(A, rest, d, from))
+ 

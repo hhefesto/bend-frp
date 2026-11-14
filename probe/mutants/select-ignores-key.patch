@@ -1,0 +1,11 @@
+--- a/Ops.bend
++++ b/Ops.bend
+@@ -108,7 +108,7 @@
+     case Nil{}:
+       Nil{}
+     case Con{F.Occ{+t, F.Both{k2, +a}}, rest}:
+-      F.E.keep(A, F.Occ{t, a}, E.select(~K, ~A, ~same, rest, k), same(k2, k))
++      F.E.keep(A, F.Occ{t, a}, E.select(~K, ~A, ~same, rest, k), True{})
+ 
+ def E.fan(-K: Data, -A: Data, e: F.Events(List<&2, F.Both<K, A>>)) -> F.Events(F.Both<K, A>):
+   F.E.flat(F.Both<K, A>, e)

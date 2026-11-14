@@ -1,0 +1,11 @@
+--- a/Ops.bend
++++ b/Ops.bend
+@@ -135,7 +135,7 @@
+     case Nil{}:
+       Nil{}
+     case Con{F.Occ{+t, +a}, +rest}:
+-      F.E.keep(A, F.Occ{F.Time.add(t, d), a}, E.debounce(A, d, rest), E.quiet(A, rest, F.Time.add(t, d)))
++      F.E.keep(A, F.Occ{F.Time.add(t, d), a}, E.debounce(A, d, rest), True{})
+ 
+ # throttle: an occurrence passes if it is at least d after the last that
+ # passed (the first passes); the others are dropped.

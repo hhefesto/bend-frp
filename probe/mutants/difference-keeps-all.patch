@@ -1,0 +1,11 @@
+--- a/Ops.bend
++++ b/Ops.bend
+@@ -49,7 +49,7 @@
+     case Nil{}:
+       Nil{}
+     case Con{F.Occ{+t, +a}, rest}:
+-      F.E.keep(A, F.Occ{t, a}, E.difference(A, B, rest, e2), Bool.not(E.occurs(B, e2, t)))
++      F.E.keep(A, F.Occ{t, a}, E.difference(A, B, rest, e2), True{})
+ 
+ # gate: e's occurrences at times b is True.
+ def E.gate.pick(-A: Data, a: A, open: Bool) -> Maybe<&2, A>:

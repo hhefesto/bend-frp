@@ -1,0 +1,14 @@
+--- a/Ops.bend
++++ b/Ops.bend
+@@ -55,9 +55,9 @@
+ def E.gate.pick(-A: Data, a: A, open: Bool) -> Maybe<&2, A>:
+   match open:
+     case True{}:
+-      Some{a}
+-    case False{}:
+       None{}
++    case False{}:
++      Some{a}
+ 
+ def E.gate(~A: Data, ~b: F.Behavior(Bool), e: F.Events(A)) -> F.Events(A):
+   F.E.justs(A, F.E.snapshot(~A, ~Bool, ~Maybe<&2, A>, ~E.gate.pick(A), ~b, e))

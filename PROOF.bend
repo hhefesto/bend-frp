@@ -4,11 +4,13 @@
 import Base
 import ./Frp.bend as F
 import ./Dyn.bend as D
+import ./Ops.bend as Op
 import ./LAWS.bend as Laws
 import ./proof/Logic.bend as L
 import ./proof/Order.bend as O
 import ./proof/Events.bend as Ev
 import ./proof/Dyn.bend as Dp
+import ./proof/Ops.bend as Pp
 
 def Laws.b_map_id(A, b, t):
   {==}
@@ -798,3 +800,122 @@ def Laws.dyn_join_map_pure(A, d):
     case D.Dyn{x, e}:
       Equal.cong(F.Events(A), D.Dyn<A>, z => D.Dyn{x, z},
         D.Dyn.join.go(A, F.E.map(~A, ~D.Dyn<A>, ~D.Dyn.pure(A), e), Nil{}), e, Dp.join_pure_at(A, e))
+
+# More event combinators
+# ----------------------
+
+def Laws.e_merge_with_never_l(A, f, e):
+  {==}
+
+def Laws.e_merge_with_never_r(A, f, e):
+  match e:
+    case Nil{}:
+      {==}
+    case Con{F.Occ{t, a}, xs}:
+      {==}
+
+def Laws.e_merge_with_first(A, f, t, a, xs, u, b, ys, h):
+  Pp.mw.lt(A, f, F.Time.cmp(t, u), t, a, u, b, xs, ys, O.is_lt_true(F.Time.cmp(t, u), h))
+
+def Laws.e_merge_with_later(A, f, t, a, xs, u, b, ys, h):
+  Pp.mw.gt(A, f, F.Time.cmp(t, u), t, a, u, b, xs, ys,
+    Equal.trans(Cmp, F.Time.cmp(t, u), O.cmp.flip(F.Time.cmp(u, t)), GT{}, O.time_cmp_flip(t, u),
+      Equal.cong(Cmp, Cmp, z => O.cmp.flip(z), F.Time.cmp(u, t), LT{}, O.is_lt_true(F.Time.cmp(u, t), h))))
+
+def Laws.e_merge_with_same(A, f, t, a, xs, b, ys):
+  Pp.mw.eq(A, f, F.Time.cmp(t, t), t, a, b, xs, ys, O.time_cmp_refl(t))
+
+def Laws.e_leftmost_same(A, t, a, xs, b, ys):
+  Pp.mw.eq(A, Op.E.left(A), F.Time.cmp(t, t), t, a, b, xs, ys, O.time_cmp_refl(t))
+
+def Laws.e_difference_never(A, B, e):
+  Pp.difference_never(A, B, e)
+
+def Laws.e_difference_keep(A, B, t, a, e1, e2, h):
+  Ev.keep.hit(A, F.Occ{t, a}, Op.E.difference(A, B, e1, e2), Bool.not(Op.E.occurs(B, e2, t)), L.not.of(Op.E.occurs(B, e2, t), h))
+
+def Laws.e_difference_drop(A, B, t, a, e1, e2, h):
+  Ev.keep.miss(A, F.Occ{t, a}, Op.E.difference(A, B, e1, e2), Bool.not(Op.E.occurs(B, e2, t)),
+    Equal.cong(Bool, Bool, x => Bool.not(x), Op.E.occurs(B, e2, t), True{}, h))
+
+def Laws.e_gate_keep(A, b, t, a, e, h):
+  Pp.gate.hit(A, b(t), t, a, F.E.snapshot(~A, ~Bool, ~Maybe<&2, A>, ~Op.E.gate.pick(A), ~b, e), h)
+
+def Laws.e_gate_drop(A, b, t, a, e, h):
+  Pp.gate.miss(A, b(t), t, a, F.E.snapshot(~A, ~Bool, ~Maybe<&2, A>, ~Op.E.gate.pick(A), ~b, e), h)
+
+def Laws.e_gate_ordered(A, b, e, h):
+  Ev.justs_ordered(A, F.E.snapshot(~A, ~Bool, ~Maybe<&2, A>, ~Op.E.gate.pick(A), ~b, e),
+    Equal.trans(Bool, F.E.ordered(Maybe<&2, A>, F.E.snapshot(~A, ~Bool, ~Maybe<&2, A>, ~Op.E.gate.pick(A), ~b, e)),
+      F.E.ordered(A, e), True{}, Ev.snapshot_ordered(A, Bool, Maybe<&2, A>, Op.E.gate.pick(A), b, e), h))
+
+def Laws.e_head_tail(A, e):
+  match e:
+    case Nil{}:
+      {==}
+    case Con{o, rest}:
+      {==}
+
+def Laws.e_take_drop(A, e, n):
+  Pp.take_drop(A, e, n)
+
+law take_zero:
+  for -A: Data
+  for e: F.Events(A)
+  {Op.E.take(A, e, 0n) == Nil{} : F.Events(A)}
+
+def take_zero(A, e):
+  match e:
+    case Nil{}:
+      {==}
+    case Con{o, rest}:
+      {==}
+
+def Laws.e_head_take(A, e):
+  match e:
+    case Nil{}:
+      {==}
+    case Con{o, rest}:
+      L.cons_cong(F.Occ<A>, o, Nil{}, Op.E.take(A, rest, 0n), Equal.sym(F.Events(A), Op.E.take(A, rest, 0n), Nil{}, take_zero(A, rest)))
+
+def Laws.e_take_ordered(A, e, n, h):
+  Pp.take_ordered(A, e, n, h)
+
+def Laws.e_drop_ordered(A, e, n, h):
+  Pp.drop_ordered(A, e, n, h)
+
+def Laws.e_select_hit(K, A, same, t, k2, a, e, k, h):
+  Ev.keep.hit(A, F.Occ{t, a}, Op.E.select(~K, ~A, ~same, e, k), same(k2, k), h)
+
+def Laws.e_select_miss(K, A, same, t, k2, a, e, k, h):
+  Ev.keep.miss(A, F.Occ{t, a}, Op.E.select(~K, ~A, ~same, e, k), same(k2, k), h)
+
+def Laws.e_select_ordered(K, A, same, e, k, h):
+  Pp.select_ordered(K, A, same, e, k, h)
+
+def Laws.e_fan_ordered(K, A, e, h):
+  Ev.flat_ordered(F.Both<K, A>, e, h)
+
+def Laws.e_delay_never(A, d):
+  {==}
+
+def Laws.e_delay_occ(A, d, t, a, e):
+  {==}
+
+def Laws.e_debounce_never(A, d):
+  {==}
+
+def Laws.e_debounce_keep(A, d, t, a, e, h):
+  Ev.keep.hit(A, F.Occ{F.Time.add(t, d), a}, Op.E.debounce(A, d, e), Op.E.quiet(A, e, F.Time.add(t, d)), h)
+
+def Laws.e_debounce_drop(A, d, t, a, e, h):
+  Ev.keep.miss(A, F.Occ{F.Time.add(t, d), a}, Op.E.debounce(A, d, e), Op.E.quiet(A, e, F.Time.add(t, d)), h)
+
+def Laws.e_throttle_first(A, d, t, a, e):
+  {==}
+
+def Laws.e_throttle_open(A, d, from, t, a, e, h):
+  Pp.throttle.hit(A, F.Time.le(from, t), t, a, Op.E.throttle.from(A, e, d, F.Time.add(t, d)), Op.E.throttle.from(A, e, d, from), h)
+
+def Laws.e_throttle_shut(A, d, from, t, a, e, h):
+  Pp.throttle.miss(A, F.Time.le(from, t), t, a, Op.E.throttle.from(A, e, d, F.Time.add(t, d)), Op.E.throttle.from(A, e, d, from), h)

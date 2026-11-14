@@ -22,6 +22,7 @@
         fileset = nixpkgs.lib.fileset.unions [
           ./Frp.bend
           ./Dyn.bend
+          ./Ops.bend
           ./LAWS.bend
           ./PROOF.bend
           ./proof
@@ -93,7 +94,7 @@
           '';
           # every module and example checks
           modules = inSource pkgs "modules" ''
-            for f in Frp.bend Dyn.bend Web.bend probe/Probe.bend probe/Probe2.bend probe/Snap.bend probe/Switch.bend probe/Time.bend probe/Dyn.bend examples/todo/App.bend; do
+            for f in Frp.bend Dyn.bend Ops.bend Web.bend probe/Probe.bend probe/Probe2.bend probe/Snap.bend probe/Switch.bend probe/Time.bend probe/Dyn.bend probe/Ops.bend examples/todo/App.bend; do
               echo "== $f"
               bend $f --check-only 2>&1 | tee log
               grep -q 'ALL PROOFS CHECK' log
@@ -119,6 +120,11 @@
           dyn = inSource pkgs "dyn" ''
             bend probe/Dyn.bend 2>&1 | tee $out
             grep -qxF "[[0, 100, 102, 304, 304, 504, 504, 504], [0, 100, 102, 304, 304, 504, 504, 504], [0, 1, 101, 103, 103, 200, 200, 207], [0, 1, 101, 103, 103, 200, 200, 207]]" $out
+          '';
+          # Ops.bend's combinators run as their meanings say, on sample events
+          ops = inSource pkgs "ops" ''
+            bend probe/Ops.bend 2>&1 | tee $out
+            grep -qxF '[" 2:1 4:22 6:30 8:4", " 2:1 4:2 6:30 8:4", " 2:1 8:4", " 2:1 4:2", " 2:1 4:2 | 8:4", " 2:1 6:3", " 4:1 6:2 10:4", " 7:2 14:4 21:5", " 2:1 10:3 18:5"]' $out
           '';
           # the laws catch each mistake in probe/mutants/: PROOF.bend fails on every one
           mutants = inSource pkgs "mutants" ''

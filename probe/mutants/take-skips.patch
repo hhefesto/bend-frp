@@ -1,0 +1,11 @@
+--- a/Ops.bend
++++ b/Ops.bend
+@@ -87,7 +87,7 @@
+         case 0n:
+           Nil{}
+         case 1n+p:
+-          o <> E.take(A, rest, p)
++          E.take(A, rest, p)
+ 
+ def E.drop(-A: Data, e: F.Events(A), n: Nat) -> F.Events(A):
+   match e:
