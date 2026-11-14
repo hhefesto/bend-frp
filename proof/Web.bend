@@ -807,3 +807,50 @@ def diff_apply(a, b):
       Equal.cong(List<&2, W.Html>, W.Html, hs => W.html.first(hs, W.HRaw{t1, k1, a1, h1}),
         W.apply.kids(W.diff.kids([W.HRaw{t1, k1, a1, h1}], [W.HRaw{t2, k2, a2, h2}]), [W.HRaw{t1, k1, a1, h1}]), [W.HRaw{t2, k2, a2, h2}],
         diff_apply_kids([W.HRaw{t1, k1, a1, h1}], [W.HRaw{t2, k2, a2, h2}]))
+
+# Escaped text has no < > or "
+# ----------------------------
+
+law pick.safe:
+  for amp: Bool
+  for lt: Bool
+  for gt: Bool
+  for quot: Bool
+  for +x: U32
+  for -r: String
+  for e60: {U32.is_eq(x, 60) == lt : Bool}
+  for e62: {U32.is_eq(x, 62) == gt : Bool}
+  for e34: {U32.is_eq(x, 34) == quot : Bool}
+  for ih: {W.safe(r) == True{} : Bool}
+  {W.safe(W.esc.pick(amp, lt, gt, quot, x, r)) == True{} : Bool}
+
+def pick.safe(amp, lt, gt, quot, x, r, e60, e62, e34, ih):
+  match amp lt gt quot:
+    case True{} _ _ _:
+      ih
+    case False{} True{} _ _:
+      ih
+    case False{} False{} True{} _:
+      ih
+    case False{} False{} False{} True{}:
+      ih
+    case False{} False{} False{} False{}:
+      %Equal.sym(Bool, U32.is_eq(x, 60), False{}, e60) :
+        {(Bool.not(_) && (Bool.not(U32.is_eq(x, 62)) && (Bool.not(U32.is_eq(x, 34)) && W.safe(r)))) == True{} : Bool}
+      %Equal.sym(Bool, U32.is_eq(x, 62), False{}, e62) :
+        {(Bool.not(False{}) && (Bool.not(_) && (Bool.not(U32.is_eq(x, 34)) && W.safe(r)))) == True{} : Bool}
+      %Equal.sym(Bool, U32.is_eq(x, 34), False{}, e34) :
+        {(Bool.not(False{}) && (Bool.not(False{}) && (Bool.not(_) && W.safe(r)))) == True{} : Bool}
+      ih
+
+law escape_safe:
+  for s: String
+  {W.safe(W.escape(s)) == True{} : Bool}
+
+def escape_safe(s):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{Chr{+x}, rest}:
+      pick.safe(U32.is_eq(x, 38), U32.is_eq(x, 60), U32.is_eq(x, 62), U32.is_eq(x, 34), x, W.escape(rest),
+        {==}, {==}, {==}, escape_safe(rest))

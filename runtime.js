@@ -33,6 +33,13 @@ export function mount(App, root, host = (globalThis.bendFrp ??= {})) {
   const queue = [];
   let busy = false;
 
+  // Open sockets by tag; the tags told of the page's address.
+  const sockets = {};
+  const routes = [];
+  const here = () => location.pathname + location.search + location.hash;
+  const routed = () => routes.forEach((tag) => fire(tag, here()));
+  globalThis.addEventListener?.("popstate", routed);
+
   // An input's time: the clock, read here and made a Time by Web.bend's
   // stamp, which keeps it after the last input's: no two inputs share a time.
   let last = { $: "Time", sec: 0, frac: 0 };
@@ -80,6 +87,31 @@ export function mount(App, root, host = (globalThis.bendFrp ??= {})) {
     } else if (fx.$ === "Host") {
       const a = host[fx.name]?.(fx.arg, (v) => fire(fx.tag, String(v)));
       if (typeof a === "string") queue.push({ $: "Input", at: stamp(), tag: fx.tag, value: a });
+    } else if (fx.$ === "WsOpen") {
+      const ws = new WebSocket(fx.url);
+      sockets[fx.tag] = ws;
+      ws.onopen = () => fire(fx.tag + ":open", "");
+      ws.onmessage = (m) => fire(fx.tag, String(m.data));
+      ws.onclose = () => {
+        delete sockets[fx.tag];
+        fire(fx.tag + ":closed", "");
+      };
+    } else if (fx.$ === "WsSend") {
+      sockets[fx.tag]?.send(fx.data);
+    } else if (fx.$ === "WsClose") {
+      sockets[fx.tag]?.close();
+    } else if (fx.$ === "Route") {
+      routes.push(fx.tag);
+      queue.push({ $: "Input", at: stamp(), tag: fx.tag, value: here() });
+    } else if (fx.$ === "Navigate") {
+      history.pushState(null, "", fx.url);
+      routed();
+    } else if (fx.$ === "StoreSet") {
+      localStorage.setItem(fx.key, fx.value);
+    } else if (fx.$ === "StoreGet") {
+      queue.push({ $: "Input", at: stamp(), tag: fx.tag, value: localStorage.getItem(fx.key) ?? "" });
+    } else if (fx.$ === "StoreDel") {
+      localStorage.removeItem(fx.key);
     }
   };
 

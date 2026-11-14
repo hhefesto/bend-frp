@@ -16,6 +16,38 @@ type Input is Data:
 def stamp(+last: F.Time, s: U32, ms: U32, sub: U32) -> F.Time:
   F.Time.after(last, F.Time.from_clock(s, ms, sub))
 
+# Routing
+# -------
+
+# The segments of an address's path, what a Route answers ready to match on:
+# "/notes/7?x=1#top" is ["notes", "7"]; empty segments are left out.
+def path.close(cur: String, acc: List<&2, String>) -> List<&2, String>:
+  match cur:
+    case SNil{}:
+      acc
+    case SCon{c, rest}:
+      String.reverse(SCon{c, rest}) <> acc
+
+def path.pick(slash: Bool, stop: Bool, +x: U32, cur: String, acc: List<&2, String>,
+              more: String -> List<&2, String> -> List<&2, String>) -> List<&2, String>:
+  match slash stop:
+    case True{} _:
+      more("", path.close(cur, acc))
+    case False{} True{}:
+      List.reverse(&2, String, path.close(cur, acc))
+    case False{} False{}:
+      more(SCon{Chr{x}, cur}, acc)
+
+def path.go(s: String, cur: String, acc: List<&2, String>) -> List<&2, String>:
+  match s:
+    case SNil{}:
+      List.reverse(&2, String, path.close(cur, acc))
+    case SCon{Chr{+x}, rest}:
+      path.pick(U32.is_eq(x, 47), U32.is_eq(x, 63) || U32.is_eq(x, 35), x, cur, acc, c => a => path.go(rest, c, a))
+
+def path(s: String) -> List<&2, String>:
+  path.go(s, "", [])
+
 type Attr is Data:
   # An attribute, or the property of that name for value, checked, disabled.
   Prop{+name: String, +value: String}
@@ -49,6 +81,23 @@ type Effect is Data:
   # A function of the page's own (window.bendFrp[name]), with a string; its
   # answer, if it returns a string, comes back as Input{tag, it}.
   Host{+tag: String, +name: String, +arg: String}
+  # A WebSocket to url, known by tag: Input{tag ++ ":open", ""} once it opens,
+  # Input{tag, the message} for each message, Input{tag ++ ":closed", ""} once
+  # it closes.
+  WsOpen{+tag: String, +url: String}
+  # A message on the socket known by tag.
+  WsSend{+tag: String, +data: String}
+  WsClose{+tag: String}
+  # The page's address (path, query and fragment): Input{tag, it} now, and
+  # again each time it changes (back, forward, or Navigate).
+  Route{+tag: String}
+  # Go to url in the page's history (pushState), and tell each Route.
+  Navigate{+url: String}
+  # The browser's storage for this site (localStorage): keep value under key;
+  # Input{tag, the value kept under key, or ""}; forget key.
+  StoreSet{+key: String, +value: String}
+  StoreGet{+tag: String, +key: String}
+  StoreDel{+key: String}
 
 type Out is Data:
   Out{+view: Html, +effects: List<&2, Effect>}
@@ -328,3 +377,103 @@ def html.first(hs: List<&2, Html>, a: Html) -> Html:
 
 def apply(e: Edit, +a: Html) -> Html:
   html.first(apply.kids([KSame{e}], [a]), a)
+
+# Rendering to HTML
+# -----------------
+
+# A page's HTML, for a server to send before the script runs (server-side
+# rendering): text escaped, attributes and properties as attributes, handlers
+# left to runtime.js.
+
+# s with & < > " written as entities: so text and attribute values cannot open
+# a tag or close an attribute (LAWS.bend, page_escape_safe).
+def esc.pick(amp: Bool, lt: Bool, gt: Bool, quot: Bool, x: U32, r: String) -> String:
+  match amp lt gt quot:
+    case True{} _ _ _:
+      "&amp;" ++ r
+    case False{} True{} _ _:
+      "&lt;" ++ r
+    case False{} False{} True{} _:
+      "&gt;" ++ r
+    case False{} False{} False{} True{}:
+      "&quot;" ++ r
+    case False{} False{} False{} False{}:
+      SCon{Chr{x}, r}
+
+def escape(s: String) -> String:
+  match s:
+    case SNil{}:
+      SNil{}
+    case SCon{Chr{+x}, rest}:
+      esc.pick(U32.is_eq(x, 38), U32.is_eq(x, 60), U32.is_eq(x, 62), U32.is_eq(x, 34), x, escape(rest))
+
+# Whether s has no < > or ".
+def safe(s: String) -> Bool:
+  match s:
+    case SNil{}:
+      True{}
+    case SCon{Chr{+x}, rest}:
+      Bool.not(U32.is_eq(x, 60)) && (Bool.not(U32.is_eq(x, 62)) && (Bool.not(U32.is_eq(x, 34)) && safe(rest)))
+
+# Elements with no closing tag.
+def void(+t: String) -> Bool:
+  String.eq(t, "input") || (String.eq(t, "br") || (String.eq(t, "img") || (String.eq(t, "hr") || (String.eq(t, "meta") ||
+    (String.eq(t, "link") || (String.eq(t, "area") || (String.eq(t, "base") || (String.eq(t, "col") || (String.eq(t, "embed") ||
+    (String.eq(t, "source") || (String.eq(t, "track") || String.eq(t, "wbr"))))))))))))
+
+def render.flag.on(+n: String, on: Bool) -> String:
+  match on:
+    case True{}:
+      " " ++ n
+    case False{}:
+      ""
+
+# A property that is a flag (checked, disabled, selected) is there unless it
+# is "" or "false", as runtime.js sets it.
+def render.flag(+n: String, +v: String, flag: Bool) -> String:
+  match flag:
+    case True{}:
+      render.flag.on(n, Bool.not(String.eq(v, "") || String.eq(v, "false")))
+    case False{}:
+      " " ++ n ++ "=\"" ++ escape(v) ++ "\""
+
+def render.attr(a: Attr) -> String:
+  match a:
+    case Prop{+n, +v}:
+      render.flag(n, v, String.eq(n, "checked") || (String.eq(n, "disabled") || String.eq(n, "selected")))
+    case Once{+n, +v}:
+      render.flag(n, v, String.eq(n, "checked") || (String.eq(n, "disabled") || String.eq(n, "selected")))
+    case On{e, t}:
+      ""
+    case OnStop{e, t}:
+      ""
+    case OnKey{k, t}:
+      ""
+
+def render.attrs(as: List<&2, Attr>) -> String:
+  match as:
+    case Nil{}:
+      ""
+    case Con{a, rest}:
+      render.attr(a) ++ render.attrs(rest)
+
+def render.close(+t: String, inner: String, v: Bool) -> String:
+  match v:
+    case True{}:
+      ""
+    case False{}:
+      inner ++ "</" ++ t ++ ">"
+
+def render.list(hs: List<&2, Html>) -> String:
+  match hs:
+    case Nil{}:
+      ""
+    case Con{HText{s}, rest}:
+      escape(s) ++ render.list(rest)
+    case Con{HNode{+t, k, a, c}, rest}:
+      "<" ++ t ++ render.attrs(a) ++ ">" ++ render.close(t, render.list(c), void(t)) ++ render.list(rest)
+    case Con{HRaw{+t, k, a, h}, rest}:
+      "<" ++ t ++ render.attrs(a) ++ ">" ++ h ++ "</" ++ t ++ ">" ++ render.list(rest)
+
+def render(h: Html) -> String:
+  render.list([h])

@@ -933,3 +933,6 @@ def Laws.page_diff_kids_apply(olds, news):
 
 def Laws.page_diff_self(a):
   Pw.diff_self(a)
+
+def Laws.page_escape_safe(s):
+  Pw.escape_safe(s)

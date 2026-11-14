@@ -94,7 +94,7 @@
           '';
           # every module and example checks
           modules = inSource pkgs "modules" ''
-            for f in Frp.bend Dyn.bend Ops.bend Web.bend probe/Probe.bend probe/Probe2.bend probe/Snap.bend probe/Switch.bend probe/Time.bend probe/Dyn.bend probe/Ops.bend examples/todo/App.bend; do
+            for f in Frp.bend Dyn.bend Ops.bend Web.bend probe/Probe.bend probe/Probe2.bend probe/Snap.bend probe/Switch.bend probe/Time.bend probe/Dyn.bend probe/Ops.bend probe/Page.bend examples/todo/App.bend; do
               echo "== $f"
               bend $f --check-only 2>&1 | tee log
               grep -q 'ALL PROOFS CHECK' log
@@ -125,6 +125,11 @@
           ops = inSource pkgs "ops" ''
             bend probe/Ops.bend 2>&1 | tee $out
             grep -qxF '[" 2:1 4:22 6:30 8:4", " 2:1 4:2 6:30 8:4", " 2:1 8:4", " 2:1 4:2", " 2:1 4:2 | 8:4", " 2:1 6:3", " 4:1 6:2 10:4", " 7:2 14:4 21:5", " 2:1 10:3 18:5"]' $out
+          '';
+          # a view rendered to HTML, and addresses split, as worked out by hand
+          page = inSource pkgs "page" ''
+            bend probe/Page.bend 2>&1 | tee $out
+            grep -qxF '["<div class=\"app\">a &lt; b &amp; &quot;c&quot;<input value=\"q&quot;x\" checked><p><b>raw</b></p></div>", "notes|7", "a|b"]' $out
           '';
           # the laws catch each mistake in probe/mutants/: PROOF.bend fails on every one
           mutants = inSource pkgs "mutants" ''

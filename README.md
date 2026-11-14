@@ -217,7 +217,7 @@ ALL PROOFS CHECK when every law holds; `--verdict` rechecks with BendTT's kernel
   and `gate`, `take`, `drop`, `select` and `fan` keep time order;
 - the page's diff (`Web.bend`): applying `diff(a, b)` to `a` gives `b`, and
   applying `diff.kids` of two lists of children to the first gives the second;
-  `diff(a, a)` is `EKeep`.
+  `diff(a, a)` is `EKeep`; escaped text has no `<`, `>` or `"`.
 
 The laws are tested by breaking the library on purpose, one mistake at a time
 (`probe/mutants.sh`): a `map` that drops occurrences or shifts their times, a
@@ -238,7 +238,8 @@ the rest, a `take` that skips, a `select` that ignores the key, a `delay`
 that does not wait, a `debounce` that keeps every occurrence, a
 `throttle` that lets all through; a page diff that misses a text's change or an
 element's new attributes, keeps old children that should go, or calls a
-changed element kept. Each one makes `PROOF.bend` fail.
+changed element kept, and an escape that lets `<` through. Each one makes
+`PROOF.bend` fail.
 
 `PROOF.bend` fills each law from lemmas in `proof/`: `Logic.bend` (absurdity,
 clashes of constructors, the cases of a `Bool`), `Order.bend` (the order of
@@ -257,7 +258,8 @@ with `--verdict`, every module checked, the machines of `probe/Snap.bend`
 and `probe/Switch.bend` run against their meanings, Time's arithmetic run
 against worked values (`probe/Time.bend`), `zip` and `join` against their
 meanings (`probe/Dyn.bend`), `Ops.bend`'s combinators against worked values
-(`probe/Ops.bend`), the mutants, and the probe and todo
+(`probe/Ops.bend`), a view rendered to HTML and addresses split
+(`probe/Page.bend`), the mutants, and the probe and todo
 pages bundled (`nix build .#todo` is the todo page's web directory).
 
 ## How it runs in Bend
@@ -298,8 +300,18 @@ runs a window:
   (Bend compiles it with `bend page.html -o dist`), and does each edit `diff`
   gives with a DOM call or two. It also builds new nodes, writes an element's
   changed attributes (properties for `value`, `checked`, `disabled` and
-  `selected`), keeps the listeners, and does the effects: `fetch`, timers,
-  focus and the page's own functions.
+  `selected`), keeps the listeners, and does the effects.
+- Effects (as reflex-dom's): `Http` requests, `After` timers, `Focus`, `Host`
+  (the page's own functions); WebSockets (`WsOpen`, `WsSend`, `WsClose`: an
+  input when one opens, one for each message, one when it closes); the page's
+  address (`Route`: an input now and at each change, back and forward
+  included; `Navigate`: go to an address in the history; `W.path` splits an
+  address into the segments to route on); the browser's storage (`StoreSet`,
+  `StoreGet`, `StoreDel`, on `localStorage`).
+- Server-side rendering: `W.render(view)` is the view as HTML, for a server to
+  send before the script runs: text and attribute values escaped (`LAWS.bend`
+  proves escaped text has no `<`, `>` or `"`, `page_escape_safe`), properties
+  as attributes, handlers left to the script.
 
 ## Phones
 

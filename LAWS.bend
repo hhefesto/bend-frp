@@ -901,3 +901,9 @@ law page_diff_kids_apply:
 law page_diff_self:
   for +a: W.Html
   {W.diff(a, a) == W.EKeep{} : W.Edit}
+
+# Rendering to HTML: escaped text has no < > or ", so neither text nor an
+# attribute's value can open a tag or close the attribute.
+law page_escape_safe:
+  for s: String
+  {W.safe(W.escape(s)) == True{} : Bool}
