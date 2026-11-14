@@ -32,7 +32,8 @@ type Attr is Data:
 
 type Html is Data:
   HText{+s: String}
-  # Children compare by key where they have one, else by place.
+  # Children compare by place (Web.bend's diff): one whose tag or key changed
+  # is built afresh.
   HNode{+tag: String, +key: String, +attrs: List<&2, Attr>, +kids: List<&2, Html>}
   # An element whose inside is ready-made HTML.
   HRaw{+tag: String, +key: String, +attrs: List<&2, Attr>, +html: String}
@@ -78,3 +79,252 @@ def text(s: String) -> Html:
 
 def cls(c: String) -> Attr:
   Prop{"class", c}
+
+# The page's diff
+# ---------------
+
+# What diff says to do to one node of a page to make the last view the new
+# one. runtime.js does each edit with a DOM call or two.
+type Edit is Data:
+  # Nothing changed.
+  EKeep{}
+  # Build this node in the old one's place.
+  ESwap{+node: Html}
+  # A text node's new text.
+  EText{+s: String}
+  # The same element: its new attributes (None: unchanged), and its children's
+  # edits.
+  ENode{+attrs: Maybe<&2, List<&2, Attr>>, +kids: List<&2, Kid>}
+  # The same ready-made element: its new attributes and inside, where changed.
+  ERaw{+attrs: Maybe<&2, List<&2, Attr>>, +html: Maybe<&2, String>}
+
+# Children compare by place: the edits of those in both, in order, then the
+# old ones left removed or the new ones left added at the end.
+type Kid is Data:
+  KSame{+edit: Edit}
+  KDrop{}
+  KAdd{+node: Html}
+
+# Equality of strings and attributes, code by code.
+def str.eq(a: String, b: String) -> Bool:
+  match a b:
+    case SNil{} SNil{}:
+      True{}
+    case SCon{Chr{x}, as} SCon{Chr{y}, bs}:
+      U32.is_eq(x, y) && str.eq(as, bs)
+    case x y:
+      False{}
+
+# An attribute as three parts: which kind it is, and its two strings; made
+# back from them.
+def attr.kind(a: Attr) -> U32:
+  match a:
+    case Prop{n, v}:
+      0
+    case Once{n, v}:
+      1
+    case On{n, v}:
+      2
+    case OnStop{n, v}:
+      3
+    case OnKey{n, v}:
+      4
+
+def attr.fst(a: Attr) -> String:
+  match a:
+    case Prop{n, v}:
+      n
+    case Once{n, v}:
+      n
+    case On{n, v}:
+      n
+    case OnStop{n, v}:
+      n
+    case OnKey{n, v}:
+      n
+
+def attr.snd(a: Attr) -> String:
+  match a:
+    case Prop{n, v}:
+      v
+    case Once{n, v}:
+      v
+    case On{n, v}:
+      v
+    case OnStop{n, v}:
+      v
+    case OnKey{n, v}:
+      v
+
+def attr.make.go(k0: Bool, k1: Bool, k2: Bool, k3: Bool, n: String, v: String) -> Attr:
+  match k0 k1 k2 k3:
+    case True{} _ _ _:
+      Prop{n, v}
+    case False{} True{} _ _:
+      Once{n, v}
+    case False{} False{} True{} _:
+      On{n, v}
+    case False{} False{} False{} True{}:
+      OnStop{n, v}
+    case False{} False{} False{} False{}:
+      OnKey{n, v}
+
+def attr.make(+k: U32, n: String, v: String) -> Attr:
+  attr.make.go(U32.is_eq(k, 0), U32.is_eq(k, 1), U32.is_eq(k, 2), U32.is_eq(k, 3), n, v)
+
+def attr.eq(+a: Attr, +b: Attr) -> Bool:
+  U32.is_eq(attr.kind(a), attr.kind(b)) && (str.eq(attr.fst(a), attr.fst(b)) && str.eq(attr.snd(a), attr.snd(b)))
+
+def attrs.eq(a: List<&2, Attr>, b: List<&2, Attr>) -> Bool:
+  match a b:
+    case Nil{} Nil{}:
+      True{}
+    case Con{x, xs} Con{y, ys}:
+      attr.eq(x, y) && attrs.eq(xs, ys)
+    case x y:
+      False{}
+
+def edit.text(same: Bool, s: String) -> Edit:
+  match same:
+    case True{}:
+      EKeep{}
+    case False{}:
+      EText{s}
+
+def edit.attrs(same: Bool, a: List<&2, Attr>) -> Maybe<&2, List<&2, Attr>>:
+  match same:
+    case True{}:
+      None{}
+    case False{}:
+      Some{a}
+
+def edit.html(same: Bool, h: String) -> Maybe<&2, String>:
+  match same:
+    case True{}:
+      None{}
+    case False{}:
+      Some{h}
+
+# Whether every child is kept as it is.
+def kids.kept(ks: List<&2, Kid>) -> Bool:
+  match ks:
+    case Nil{}:
+      True{}
+    case Con{KSame{EKeep{}}, rest}:
+      kids.kept(rest)
+    case Con{k, rest}:
+      False{}
+
+def edit.node.if(kept: Bool, ae: Maybe<&2, List<&2, Attr>>, ks: List<&2, Kid>) -> Edit:
+  match kept:
+    case True{}:
+      EKeep{}
+    case False{}:
+      ENode{ae, ks}
+
+def edit.node.mk(ae: Maybe<&2, List<&2, Attr>>, +ks: List<&2, Kid>) -> Edit:
+  match ae:
+    case None{}:
+      edit.node.if(kids.kept(ks), None{}, ks)
+    case Some{a}:
+      ENode{Some{a}, ks}
+
+def edit.node(same: Bool, ae: Maybe<&2, List<&2, Attr>>, ks: Unit -> List<&2, Kid>, n: Html) -> Edit:
+  match same:
+    case True{}:
+      edit.node.mk(ae, ks(Unit{}))
+    case False{}:
+      ESwap{n}
+
+def edit.raw.mk(ae: Maybe<&2, List<&2, Attr>>, he: Maybe<&2, String>) -> Edit:
+  match ae he:
+    case None{} None{}:
+      EKeep{}
+    case x y:
+      ERaw{x, y}
+
+def edit.raw(same: Bool, ae: Maybe<&2, List<&2, Attr>>, he: Maybe<&2, String>, n: Html) -> Edit:
+  match same:
+    case True{}:
+      edit.raw.mk(ae, he)
+    case False{}:
+      ESwap{n}
+
+# The edits that make the children olds into news.
+def diff.kids(olds: List<&2, Html>, news: List<&2, Html>) -> List<&2, Kid>:
+  match olds news:
+    case Nil{} Nil{}:
+      Nil{}
+    case Con{o, os} Nil{}:
+      KDrop{} <> diff.kids(os, Nil{})
+    case Nil{} Con{n, ns}:
+      KAdd{n} <> diff.kids(Nil{}, ns)
+    case Con{HText{s1}, os} Con{HText{+s2}, ns}:
+      KSame{edit.text(str.eq(s1, s2), s2)} <> diff.kids(os, ns)
+    case Con{HNode{t1, k1, a1, c1}, os} Con{HNode{+t2, +k2, +a2, +c2}, ns}:
+      KSame{edit.node(str.eq(t1, t2) && str.eq(k1, k2), edit.attrs(attrs.eq(a1, a2), a2), w => diff.kids(c1, c2),
+        HNode{t2, k2, a2, c2})} <> diff.kids(os, ns)
+    case Con{HRaw{t1, k1, a1, h1}, os} Con{HRaw{+t2, +k2, +a2, +h2}, ns}:
+      KSame{edit.raw(str.eq(t1, t2) && str.eq(k1, k2), edit.attrs(attrs.eq(a1, a2), a2), edit.html(str.eq(h1, h2), h2),
+        HRaw{t2, k2, a2, h2})} <> diff.kids(os, ns)
+    case Con{o, os} Con{n, ns}:
+      KSame{ESwap{n}} <> diff.kids(os, ns)
+
+def kid.edit(ks: List<&2, Kid>, b: Html) -> Edit:
+  match ks:
+    case Con{KSame{e}, rest}:
+      e
+    case x:
+      ESwap{b}
+
+# The edit that makes the view a into b.
+def diff(a: Html, +b: Html) -> Edit:
+  kid.edit(diff.kids([a], [b]), b)
+
+# What an edit means: what it makes of the old node (and the children's
+# edits, of the old children). LAWS.bend: applying diff(a, b) to a gives b,
+# and diff(a, a) is EKeep.
+def apply.attrs(ae: Maybe<&2, List<&2, Attr>>, a: List<&2, Attr>) -> List<&2, Attr>:
+  match ae:
+    case None{}:
+      a
+    case Some{n}:
+      n
+
+def apply.html(he: Maybe<&2, String>, h: String) -> String:
+  match he:
+    case None{}:
+      h
+    case Some{n}:
+      n
+
+def apply.kids(ks: List<&2, Kid>, olds: List<&2, Html>) -> List<&2, Html>:
+  match ks olds:
+    case Nil{} os:
+      Nil{}
+    case Con{KDrop{}, ks2} Con{o, os}:
+      apply.kids(ks2, os)
+    case Con{KAdd{n}, ks2} os:
+      n <> apply.kids(ks2, os)
+    case Con{KSame{EKeep{}}, ks2} Con{o, os}:
+      o <> apply.kids(ks2, os)
+    case Con{KSame{ESwap{n}}, ks2} Con{o, os}:
+      n <> apply.kids(ks2, os)
+    case Con{KSame{EText{s}}, ks2} Con{o, os}:
+      HText{s} <> apply.kids(ks2, os)
+    case Con{KSame{ENode{ae, kks}}, ks2} Con{HNode{t, k, a, c}, os}:
+      HNode{t, k, apply.attrs(ae, a), apply.kids(kks, c)} <> apply.kids(ks2, os)
+    case Con{KSame{ERaw{ae, he}}, ks2} Con{HRaw{t, k, a, h}, os}:
+      HRaw{t, k, apply.attrs(ae, a), apply.html(he, h)} <> apply.kids(ks2, os)
+    case Con{x, ks2} os:
+      apply.kids(ks2, os)
+
+def html.first(hs: List<&2, Html>, a: Html) -> Html:
+  match hs:
+    case Con{h, rest}:
+      h
+    case Nil{}:
+      a
+
+def apply(e: Edit, +a: Html) -> Html:
+  html.first(apply.kids([KSame{e}], [a]), a)

@@ -1,0 +1,11 @@
+--- a/Web.bend
++++ b/Web.bend
+@@ -255,7 +255,7 @@
+     case Nil{} Nil{}:
+       Nil{}
+     case Con{o, os} Nil{}:
+-      KDrop{} <> diff.kids(os, Nil{})
++      KSame{EKeep{}} <> diff.kids(os, Nil{})
+     case Nil{} Con{n, ns}:
+       KAdd{n} <> diff.kids(Nil{}, ns)
+     case Con{HText{s1}, os} Con{HText{+s2}, ns}:

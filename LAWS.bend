@@ -6,6 +6,7 @@ import Base
 import ./Frp.bend as F
 import ./Dyn.bend as D
 import ./Ops.bend as Op
+import ./Web.bend as W
 
 # Behaviors: instances agree with the meaning's, pointwise
 # --------------------------------------------------------
@@ -880,3 +881,23 @@ law e_throttle_shut:
   for +e: F.Events(A)
   for h: {F.Time.le(from, t) == False{} : Bool}
   {Op.E.throttle.from(A, F.Occ{t, a} <> e, d, from) == Op.E.throttle.from(A, e, d, from) : F.Events(A)}
+
+# The page's diff (Web.bend)
+# --------------------------
+
+# What runtime.js does to the DOM is Web.bend's diff of the last view and the
+# new one. Applying diff(a, b) to a gives b (and for children,
+# diff.kids then apply.kids gives the new children); diff(a, a) is Keep.
+law page_diff_apply:
+  for +a: W.Html
+  for +b: W.Html
+  {W.apply(W.diff(a, b), a) == b : W.Html}
+
+law page_diff_kids_apply:
+  for olds: List<&2, W.Html>
+  for news: List<&2, W.Html>
+  {W.apply.kids(W.diff.kids(olds, news), olds) == news : List<&2, W.Html>}
+
+law page_diff_self:
+  for +a: W.Html
+  {W.diff(a, a) == W.EKeep{} : W.Edit}

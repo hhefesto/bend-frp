@@ -5,12 +5,14 @@ import Base
 import ./Frp.bend as F
 import ./Dyn.bend as D
 import ./Ops.bend as Op
+import ./Web.bend as W
 import ./LAWS.bend as Laws
 import ./proof/Logic.bend as L
 import ./proof/Order.bend as O
 import ./proof/Events.bend as Ev
 import ./proof/Dyn.bend as Dp
 import ./proof/Ops.bend as Pp
+import ./proof/Web.bend as Pw
 
 def Laws.b_map_id(A, b, t):
   {==}
@@ -919,3 +921,15 @@ def Laws.e_throttle_open(A, d, from, t, a, e, h):
 
 def Laws.e_throttle_shut(A, d, from, t, a, e, h):
   Pp.throttle.miss(A, F.Time.le(from, t), t, a, Op.E.throttle.from(A, e, d, F.Time.add(t, d)), Op.E.throttle.from(A, e, d, from), h)
+
+# The page's diff
+# ---------------
+
+def Laws.page_diff_apply(a, b):
+  Pw.diff_apply(a, b)
+
+def Laws.page_diff_kids_apply(olds, news):
+  Pw.diff_apply_kids(olds, news)
+
+def Laws.page_diff_self(a):
+  Pw.diff_self(a)

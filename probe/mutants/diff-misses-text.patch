@@ -1,0 +1,11 @@
+--- a/Web.bend
++++ b/Web.bend
+@@ -188,7 +188,7 @@
+     case True{}:
+       EKeep{}
+     case False{}:
+-      EText{s}
++      EKeep{}
+ 
+ def edit.attrs(same: Bool, a: List<&2, Attr>) -> Maybe<&2, List<&2, Attr>>:
+   match same:

@@ -214,7 +214,10 @@ ALL PROOFS CHECK when every law holds; `--verdict` rechecks with BendTT's kernel
   `debounce` keeping an occurrence the next does not follow within `d`, and
   dropping one it does; `throttle` passing the first, then passing an
   occurrence at or after the time it waits for and dropping one before it;
-  and `gate`, `take`, `drop`, `select` and `fan` keep time order.
+  and `gate`, `take`, `drop`, `select` and `fan` keep time order;
+- the page's diff (`Web.bend`): applying `diff(a, b)` to `a` gives `b`, and
+  applying `diff.kids` of two lists of children to the first gives the second;
+  `diff(a, a)` is `EKeep`.
 
 The laws are tested by breaking the library on purpose, one mistake at a time
 (`probe/mutants.sh`): a `map` that drops occurrences or shifts their times, a
@@ -232,15 +235,19 @@ that ignores the right side's change, or keeps only the left at a tie, a
 `updated` that never fires; a `merge_with` that keeps one value at a tie, a
 `difference` that keeps everything, a `gate` turned round, a `head` that keeps
 the rest, a `take` that skips, a `select` that ignores the key, a `delay`
-that does not wait, a `debounce` that keeps every occurrence, and a
-`throttle` that lets all through. Each one makes `PROOF.bend` fail.
+that does not wait, a `debounce` that keeps every occurrence, a
+`throttle` that lets all through; a page diff that misses a text's change or an
+element's new attributes, keeps old children that should go, or calls a
+changed element kept. Each one makes `PROOF.bend` fail.
 
 `PROOF.bend` fills each law from lemmas in `proof/`: `Logic.bend` (absurdity,
 clashes of constructors, the cases of a `Bool`), `Order.bend` (the order of
 times, from the bits of a `U32` up), `Events.bend` (`merge` and `filter` one
-occurrence at a time, time order, associativity) and `Dyn.bend` (steppers of
-mapped, folded, zipped and joined events) and `Ops.bend` (`merge_with`, `gate`,
-`throttle` at one occurrence, `take` then `drop`, `select` in time order).
+occurrence at a time, time order, associativity), `Dyn.bend` (steppers of
+mapped, folded, zipped and joined events), `Ops.bend` (`merge_with`, `gate`,
+`throttle` at one occurrence, `take` then `drop`, `select` in time order) and
+`Web.bend` (string and attribute equality is equality; diff then apply gives
+the new children; a diff that keeps every child came from equal children).
 
 ## Building
 
@@ -279,10 +286,20 @@ runs a window:
   a timer, a call to the page's own script), and its answer comes back as an
   input.
 - An app means `Event<Input> -> Behavior<View>`: `init()` and `step(state, input)`.
-- `runtime.js` turns DOM events into timed `Input` occurrences (their times
-  from `Web.bend`'s `stamp`), calls the step
-  (Bend compiles it with `bend page.html -o dist`), compares the new view with
-  the last and patches the DOM, writing only what the view changed.
+- The page's diff is Bend's: `Web.bend`'s `diff(a, b)` is an edit tree (keep
+  a node; build a new one in its place; a text's new text; an element's new
+  attributes, and its children's edits: kept in place and edited, dropped, or
+  added at the end). `LAWS.bend` proves that applying `diff(a, b)` to `a`
+  gives `b` (`page_diff_apply`) and that `diff(a, a)` keeps everything
+  (`page_diff_self`). Children compare by place: one whose tag or key changed
+  is built afresh, so removing a child from the middle rebuilds those after it.
+- `runtime.js` is what must be JavaScript: it turns DOM events into timed
+  `Input` occurrences (their times from `Web.bend`'s `stamp`), calls the step
+  (Bend compiles it with `bend page.html -o dist`), and does each edit `diff`
+  gives with a DOM call or two. It also builds new nodes, writes an element's
+  changed attributes (properties for `value`, `checked`, `disabled` and
+  `selected`), keeps the listeners, and does the effects: `fetch`, timers,
+  focus and the page's own functions.
 
 ## Phones
 

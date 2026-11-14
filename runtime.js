@@ -1,7 +1,8 @@
 // bend-frp's web runtime. An app (Web.bend) is two defs: init() and
 // step(state, input). This file turns the page's events and the effects'
-// answers into timed inputs, one at a time, calls step, compares the view
-// with the last one and patches the DOM. It holds no state of the app's.
+// answers into timed inputs, one at a time, calls step, and does to the DOM
+// what Web.bend's diff of the last view and the new one says. It holds no
+// state of the app's.
 //
 // Values cross as Bend's JS target has them: a constructor is
 // {$: "Name", field: value}, a String is a JS string, a pair {fst, snd}.
@@ -9,12 +10,6 @@ import W from "./Web.bend";
 
 const each = (xs, f) => {
   for (; xs.$ === "Con"; xs = xs.tail) f(xs.head);
-};
-
-const list = (xs) => {
-  const out = [];
-  each(xs, (x) => out.push(x));
-  return out;
 };
 
 // Set as properties, since the attribute only gives the first value.
@@ -58,7 +53,7 @@ export function mount(App, root, host = (globalThis.bendFrp ??= {})) {
       while (queue.length) {
         const r = App.step(state, queue.shift());
         state = r.fst;
-        node = patch(root, node, view, r.snd.view);
+        node = view ? walk(node, W.diff(view, r.snd.view)) : root.appendChild(create(r.snd.view));
         view = r.snd.view;
         each(r.snd.effects, perform);
       }
@@ -157,63 +152,32 @@ export function mount(App, root, host = (globalThis.bendFrp ??= {})) {
     return dom;
   };
 
-  const same = (a, b) => a.$ === b.$ && a.tag === b.tag && a.key === b.key;
-
-  const update = (dom, old, v) => {
-    if (v.$ === "HText") {
-      if (old.s !== v.s) dom.nodeValue = v.s;
-      return;
+  // Do what Web.bend's diff says (it is proved to make the last view the new
+  // one), an edit at a time; answer the node now in dom's place.
+  const walk = (dom, e) => {
+    if (e.$ === "EKeep") return dom;
+    if (e.$ === "ESwap") {
+      const fresh = create(e.node);
+      dom.parentNode.replaceChild(fresh, dom);
+      return fresh;
     }
-    setAttrs(dom, v.attrs);
-    if (v.$ === "HRaw") {
-      if (old.html !== v.html) dom.innerHTML = v.html;
-    } else {
-      updateKids(dom, list(old.kids), list(v.kids));
-    }
-  };
-
-  // Children: by key where they have one (moved, not rebuilt), else by place.
-  const updateKids = (dom, olds, news) => {
-    const doms = [...dom.childNodes];
-    const byKey = new Map();
-    olds.forEach((o, i) => {
-      if (o.key) byKey.set(o.key, i);
-    });
-    const used = new Array(olds.length).fill(false);
-    let place = 0;
-    let cursor = dom.firstChild;
-    news.forEach((n, j) => {
-      let i = -1;
-      if (n.key) {
-        const at = byKey.get(n.key);
-        if (at !== undefined && !used[at] && same(olds[at], n)) i = at;
-      } else {
-        while (place < olds.length && (used[place] || olds[place].key)) place++;
-        if (place < olds.length && same(olds[place], n)) i = place;
-      }
-      if (i >= 0) {
-        used[i] = true;
-        update(doms[i], olds[i], n);
-        if (doms[i] === cursor) cursor = cursor.nextSibling;
-        else dom.insertBefore(doms[i], cursor);
-      } else {
-        dom.insertBefore(create(n), cursor);
-      }
-    });
-    olds.forEach((_, i) => {
-      if (!used[i]) dom.removeChild(doms[i]);
-    });
-  };
-
-  const patch = (parent, dom, old, v) => {
-    if (old && same(old, v)) {
-      update(dom, old, v);
+    if (e.$ === "EText") {
+      dom.nodeValue = e.s;
       return dom;
     }
-    const fresh = create(v);
-    if (dom) parent.replaceChild(fresh, dom);
-    else parent.appendChild(fresh);
-    return fresh;
+    if (e.attrs.$ === "Some") setAttrs(dom, e.attrs.value);
+    if (e.$ === "ERaw") {
+      if (e.html.$ === "Some") dom.innerHTML = e.html.value;
+      return dom;
+    }
+    const doms = [...dom.childNodes];
+    let i = 0;
+    each(e.kids, (k) => {
+      if (k.$ === "KDrop") dom.removeChild(doms[i++]);
+      else if (k.$ === "KAdd") dom.appendChild(create(k.node));
+      else walk(doms[i++], k.edit);
+    });
+    return dom;
   };
 
   fire("start", "");

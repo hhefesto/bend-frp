@@ -1,0 +1,11 @@
+--- a/Web.bend
++++ b/Web.bend
+@@ -195,7 +195,7 @@
+     case True{}:
+       None{}
+     case False{}:
+-      Some{a}
++      None{}
+ 
+ def edit.html(same: Bool, h: String) -> Maybe<&2, String>:
+   match same:

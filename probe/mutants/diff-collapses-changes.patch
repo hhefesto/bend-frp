@@ -1,0 +1,11 @@
+--- a/Web.bend
++++ b/Web.bend
+@@ -212,7 +212,7 @@
+     case Con{KSame{EKeep{}}, rest}:
+       kids.kept(rest)
+     case Con{k, rest}:
+-      False{}
++      True{}
+ 
+ def edit.node.if(kept: Bool, ae: Maybe<&2, List<&2, Attr>>, ks: List<&2, Kid>) -> Edit:
+   match kept:
