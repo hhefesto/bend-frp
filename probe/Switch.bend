@@ -20,8 +20,8 @@ def fam.step(k: U32, s: U32, a: U32) -> U32 & U32:
   fam.pick(U32.is_lt(k, 1), s, a)
 
 def input() -> F.Events(F.Side<U32, U32>):
-  [F.Occ{1, F.Fire{10}}, F.Occ{2, F.Fire{10}}, F.Occ{3, F.Set{1}}, F.Occ{4, F.Fire{5}},
-   F.Occ{5, F.Fire{7}}, F.Occ{6, F.Set{0}}, F.Occ{7, F.Fire{9}}, F.Occ{8, F.Set{1}}, F.Occ{9, F.Fire{1}}]
+  [F.Occ{F.Time.secs(1), F.Fire{10}}, F.Occ{F.Time.secs(2), F.Fire{10}}, F.Occ{F.Time.secs(3), F.Set{1}}, F.Occ{F.Time.secs(4), F.Fire{5}},
+   F.Occ{F.Time.secs(5), F.Fire{7}}, F.Occ{F.Time.secs(6), F.Set{0}}, F.Occ{F.Time.secs(7), F.Fire{9}}, F.Occ{F.Time.secs(8), F.Set{1}}, F.Occ{F.Time.secs(9), F.Fire{1}}]
 
 def vals(e: F.Events(U32)) -> List<&2, U32>:
   match e:

@@ -8,7 +8,7 @@ import ./Frp.bend as F
 # What the page tells the app: which handler fired (handlers are named by
 # data, not closures), when, and what it carries (see runtime.js).
 type Input is Data:
-  Input{+at: U32, +tag: String, +value: String}
+  Input{+at: F.Time, +tag: String, +value: String}
 
 type Attr is Data:
   # An attribute, or the property of that name for value, checked, disabled.

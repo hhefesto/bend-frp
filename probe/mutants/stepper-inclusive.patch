@@ -1,11 +1,11 @@
 --- a/Frp.bend
 +++ b/Frp.bend
-@@ -125,7 +125,7 @@
+@@ -158,7 +158,7 @@
      case Con{o, rest}:
        match o:
          case Occ{+u, y}:
--          B.stepper.if(A, w => B.stepper.at(A, rest, t, y), x, U32.is_lt(u, t))
-+          B.stepper.if(A, w => B.stepper.at(A, rest, t, y), x, U32.is_le(u, t))
+-          B.stepper.if(A, w => B.stepper.at(A, rest, t, y), x, Time.lt(u, t))
++          B.stepper.if(A, w => B.stepper.at(A, rest, t, y), x, Time.le(u, t))
  
  def B.stepper(-A: Data, x: A, e: Events(A)) -> Behavior(A):
    +t => B.stepper.at(A, e, t, x)

@@ -6,18 +6,51 @@ import Base
 # The meaning
 # -----------
 
-# Time is the runtime's clock. The meaning asks only that occurrences come in
-# order; nothing here counts ticks.
-def Time() -> Data:
-  U32
+# Time means a real number of seconds: Elliott's time, dense (the reals in the
+# meaning; Fran and Reactive held it as a Double). Here it is held as 64-bit
+# fixed point: whole seconds, and the fraction in units of 2^-32 s. Like
+# Elliott's Double it is discrete underneath and does the same job, for the
+# same reasons (README.md, "Time"): the meaning never counts ticks, only
+# compares times, and the resolution (0.23 ns, for 136 years) is far finer than
+# any clock that stamps an input, so two inputs never share a time unless the
+# clock gave them one. Unlike a Double it orders exactly and is plain data, so
+# the laws about time are proved, not assumed.
+type Time is Data:
+  Time{+sec: U32, +frac: U32}
+
+# a is before b.
+def Time.lt(a: Time, b: Time) -> Bool:
+  match a:
+    case Time{+as, af}:
+      match b:
+        case Time{+bs, bf}:
+          U32.is_lt(as, bs) || (U32.is_eq(as, bs) && U32.is_lt(af, bf))
+
+# a is not after b.
+def Time.le(a: Time, b: Time) -> Bool:
+  Bool.not(Time.lt(b, a))
+
+# The sum of two times (a time and a duration): seconds add, the fractions
+# carry.
+def Time.add(a: Time, b: Time) -> Time:
+  match a:
+    case Time{as, +af}:
+      match b:
+        case Time{bs, bf}:
+          +f = U32.add(af, bf)
+          Time{U32.add(U32.add(as, bs), Bool.to_u32(U32.is_lt(f, af))), f}
+
+# n whole seconds.
+def Time.secs(n: U32) -> Time:
+  Time{n, 0}
 
 # Behavior<A> means a function of time.
 def Behavior(-A: Type) -> Type:
-  Time() -> A
+  Time -> A
 
 # An occurrence: a value at a time.
 type Occ<-A: Data> is Data:
-  Occ{+at: U32, +val: A}
+  Occ{+at: Time, +val: A}
 
 # Events<A> means its occurrences, in time order.
 def Events(-A: Data) -> Data:
@@ -26,7 +59,7 @@ def Events(-A: Data) -> Data:
 def B.pure(-A: Type, x: A) -> Behavior(A):
   t => x
 
-def B.time() -> Behavior(U32):
+def B.time() -> Behavior(Time):
   t => t
 
 def B.map(-A: Type, -B: Type, f: A -> B, b: Behavior(A)) -> Behavior(B):
@@ -78,7 +111,7 @@ def E.filter(~A: Data, ~p: A -> Bool, e: Events(A)) -> Events(A):
     case Con{+o, rest}:
       E.keep(A, o, E.filter(~A, ~p, rest), p(Occ.val(A, o)))
 
-def Occ.at(-A: Data, o: Occ<A>) -> U32:
+def Occ.at(-A: Data, o: Occ<A>) -> Time:
   match o:
     case Occ{t, x}:
       t
@@ -100,7 +133,7 @@ def E.merge.in(-A: Data, +x: Occ<A>, e2: Events(A), k: Events(A) -> Events(A)) -
     case Nil{}:
       x <> k(Nil{})
     case Con{+y, +ys}:
-      E.merge.pick(A, U32.is_lt(Occ.at(A, y), Occ.at(A, x)), x, y, k, ys, j => E.merge.in(A, x, ys, r => j(r)))
+      E.merge.pick(A, Time.lt(Occ.at(A, y), Occ.at(A, x)), x, y, k, ys, j => E.merge.in(A, x, ys, r => j(r)))
 
 def E.merge(-A: Data, e1: Events(A), e2: Events(A)) -> Events(A):
   match e1:
@@ -118,25 +151,25 @@ def B.stepper.if(-A: Data, later: Unit -> A, now: A, before: Bool) -> A:
     case False{}:
       now
 
-def B.stepper.at(-A: Data, e: Events(A), +t: U32, x: A) -> A:
+def B.stepper.at(-A: Data, e: Events(A), +t: Time, x: A) -> A:
   match e:
     case Nil{}:
       x
     case Con{o, rest}:
       match o:
         case Occ{+u, y}:
-          B.stepper.if(A, w => B.stepper.at(A, rest, t, y), x, U32.is_lt(u, t))
+          B.stepper.if(A, w => B.stepper.at(A, rest, t, y), x, Time.lt(u, t))
 
 def B.stepper(-A: Data, x: A, e: Events(A)) -> Behavior(A):
   +t => B.stepper.at(A, e, t, x)
 
 # Whether every occurrence is before t.
-def E.all_before(-A: Data, e: Events(A), +t: U32) -> Bool:
+def E.all_before(-A: Data, e: Events(A), +t: Time) -> Bool:
   match e:
     case Nil{}:
       True{}
     case Con{o, rest}:
-      U32.is_lt(Occ.at(A, o), t) && E.all_before(A, rest, t)
+      Time.lt(Occ.at(A, o), t) && E.all_before(A, rest, t)
 
 # The latest value of an event, or x when it has none.
 def E.last(-A: Data, e: Events(A), x: A) -> A:
@@ -156,17 +189,17 @@ def E.before.if(-A: Data, more: Unit -> Events(A), before: Bool) -> Events(A):
     case False{}:
       Nil{}
 
-def E.before(-A: Data, e: Events(A), +t: U32) -> Events(A):
+def E.before(-A: Data, e: Events(A), +t: Time) -> Events(A):
   match e:
     case Nil{}:
       Nil{}
     case Con{o, rest}:
       match o:
         case Occ{+u, y}:
-          E.before.if(A, w => Occ{u, y} <> E.before(A, rest, t), U32.is_lt(u, t))
+          E.before.if(A, w => Occ{u, y} <> E.before(A, rest, t), Time.lt(u, t))
 # An event with any number of values at each occurrence, spread into one
 # occurrence for each.
-def E.spread(-A: Data, +t: U32, xs: List<&2, A>, rest: Events(A)) -> Events(A):
+def E.spread(-A: Data, +t: Time, xs: List<&2, A>, rest: Events(A)) -> Events(A):
   match xs:
     case Nil{}:
       rest
@@ -309,7 +342,7 @@ def par(~S: Data, ~T: Data, ~A: Data, ~B: Data, ~C: Data, ~a: Run<S, A, B>, ~b: 
       s => +x => par.step(~S, ~T, ~A, ~B, ~C, ~Run.step(S, A, B, a), ~Run.step(T, A, C, b), s, x)}
 
 # A machine over an event: the same occurrences, their values through it.
-def E.push(-S: Data, -B: Data, +t: U32, sy: S & B, k: S -> Events(B)) -> Events(B):
+def E.push(-S: Data, -B: Data, +t: Time, sy: S & B, k: S -> Events(B)) -> Events(B):
   (s, y) = sy
   Occ{t, y} <> k(s)
 
@@ -412,20 +445,20 @@ def E.justs(-C: Data, e: Events(Maybe<&2, C>)) -> Events(C):
               Occ{t, c} <> E.justs(C, rest)
 
 # Whether no occurrence is before t.
-def E.none_before(-A: Data, e: Events(A), +t: U32) -> Bool:
+def E.none_before(-A: Data, e: Events(A), +t: Time) -> Bool:
   match e:
     case Nil{}:
       True{}
     case Con{o, rest}:
-      Bool.not(U32.is_lt(Occ.at(A, o), t)) && E.none_before(A, rest, t)
+      Bool.not(Time.lt(Occ.at(A, o), t)) && E.none_before(A, rest, t)
 
 # Whether every occurrence is after u.
-def E.all_after(-A: Data, e: Events(A), +u: U32) -> Bool:
+def E.all_after(-A: Data, e: Events(A), +u: Time) -> Bool:
   match e:
     case Nil{}:
       True{}
     case Con{o, rest}:
-      U32.is_lt(u, Occ.at(A, o)) && E.all_after(A, rest, u)
+      Time.lt(u, Occ.at(A, o)) && E.all_after(A, rest, u)
 
 # Whether a Side event's order is its times' order where it matters: no value
 # is set before (in time) a sample listed ahead of it, and every sample

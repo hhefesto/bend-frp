@@ -11,7 +11,7 @@ import ./Frp.bend as F
 law b_map_id:
   for -A: Data
   for -b: F.Behavior(A)
-  for -t: U32
+  for -t: F.Time
   {F.B.map(A, A, x => x, b)(t) == b(t) : A}
 
 law b_map_comp:
@@ -21,7 +21,7 @@ law b_map_comp:
   for -f: A -> B
   for -g: B -> C
   for -b: F.Behavior(A)
-  for -t: U32
+  for -t: F.Time
   {F.B.map(B, C, g, F.B.map(A, B, f, b))(t) == g(f(b(t))) : C}
 
 law b_ap_pure:
@@ -29,7 +29,7 @@ law b_ap_pure:
   for -B: Data
   for -f: A -> B
   for -x: A
-  for -t: U32
+  for -t: F.Time
   {F.B.ap(A, B, F.B.pure(A -> B, f), F.B.pure(A, x))(t) == f(x) : B}
 
 
@@ -39,7 +39,7 @@ law b_ap_pure:
 law b_ap_id:
   for -A: Data
   for -v: F.Behavior(A)
-  for -t: U32
+  for -t: F.Time
   {F.B.ap(A, A, F.B.pure(A -> A, x => x), v)(t) == v(t) : A}
 
 law b_ap_comp:
@@ -49,7 +49,7 @@ law b_ap_comp:
   for -u: F.Behavior(B -> C)
   for -v: F.Behavior(A -> B)
   for -w: F.Behavior(A)
-  for -t: U32
+  for -t: F.Time
   {F.B.ap(A, C, F.B.ap(A -> B, A -> C, F.B.ap(B -> C, (A -> B) -> A -> C,
        F.B.pure((B -> C) -> (A -> B) -> A -> C, g => f => x => g(f(x))), u), v), w)(t)
      == F.B.ap(B, C, u, F.B.ap(A, B, v, w))(t) : C}
@@ -59,7 +59,7 @@ law b_ap_interchange:
   for -B: Data
   for -u: F.Behavior(A -> B)
   for -y: A
-  for -t: U32
+  for -t: F.Time
   {F.B.ap(A, B, u, F.B.pure(A, y))(t) == F.B.ap(A -> B, B, F.B.pure((A -> B) -> B, f => f(y)), u)(t) : B}
 
 law b_map_ap:
@@ -67,12 +67,12 @@ law b_map_ap:
   for -B: Data
   for -f: A -> B
   for -b: F.Behavior(A)
-  for -t: U32
+  for -t: F.Time
   {F.B.map(A, B, f, b)(t) == F.B.ap(A, B, F.B.pure(A -> B, f), b)(t) : B}
 
 law b_time:
-  for -t: U32
-  {F.B.time()(t) == t : U32}
+  for -t: F.Time
+  {F.B.time()(t) == t : F.Time}
 # Events
 # ------
 
@@ -102,7 +102,7 @@ law e_map_occ:
   for ~A: Data
   for ~B: Data
   for ~f: A -> B
-  for -t: U32
+  for -t: F.Time
   for -a: A
   for -e: F.Events(A)
   {F.E.map(~A, ~B, ~f, F.Occ{t, a} <> e) == F.Occ{t, f(a)} <> F.E.map(~A, ~B, ~f, e) : F.Events(B)}
@@ -127,24 +127,24 @@ law e_merge_never_r:
 # two events have one merge, by induction on both.
 law e_merge_first:
   for -A: Data
-  for +t: U32
+  for +t: F.Time
   for -a: A
   for -xs: F.Events(A)
-  for +u: U32
+  for +u: F.Time
   for -b: A
   for -ys: F.Events(A)
-  for h: {U32.is_lt(u, t) == False{} : Bool}
+  for h: {F.Time.lt(u, t) == False{} : Bool}
   {F.E.merge(A, F.Occ{t, a} <> xs, F.Occ{u, b} <> ys) == F.Occ{t, a} <> F.E.merge(A, xs, F.Occ{u, b} <> ys) : F.Events(A)}
 
 law e_merge_later:
   for -A: Data
-  for +t: U32
+  for +t: F.Time
   for -a: A
   for -xs: F.Events(A)
-  for +u: U32
+  for +u: F.Time
   for -b: A
   for -ys: F.Events(A)
-  for h: {U32.is_lt(u, t) == True{} : Bool}
+  for h: {F.Time.lt(u, t) == True{} : Bool}
   {F.E.merge(A, F.Occ{t, a} <> xs, F.Occ{u, b} <> ys) == F.Occ{u, b} <> F.E.merge(A, F.Occ{t, a} <> xs, ys) : F.Events(A)}
 
 # filter keeps exactly the occurrences whose value passes p, at their times,
@@ -157,7 +157,7 @@ law e_filter_never:
 law e_filter_keep:
   for ~A: Data
   for ~p: A -> Bool
-  for -t: U32
+  for -t: F.Time
   for a: A
   for -e: F.Events(A)
   for h: {p(a) == True{} : Bool}
@@ -166,7 +166,7 @@ law e_filter_keep:
 law e_filter_drop:
   for ~A: Data
   for ~p: A -> Bool
-  for -t: U32
+  for -t: F.Time
   for a: A
   for -e: F.Events(A)
   for h: {p(a) == False{} : Bool}
@@ -221,7 +221,7 @@ law e_run_each:
 law stepper_after:
   for -A: Data
   for e: F.Events(A)
-  for +t: U32
+  for +t: F.Time
   for -x: A
   for all: {F.E.all_before(A, e, t) == True{} : Bool}
   {F.B.stepper(A, x, e)(t) == F.E.last(A, e, x) : A}
@@ -231,7 +231,7 @@ law stepper_after:
 law stepper_before:
   for -A: Data
   for e: F.Events(A)
-  for +t: U32
+  for +t: F.Time
   for -x: A
   {F.B.stepper(A, x, e)(t) == F.E.last(A, F.E.before(A, e, t), x) : A}
 
@@ -243,7 +243,7 @@ law switcher_stepper:
   for ~fam: K -> F.Behavior(A)
   for -k: K
   for -e: F.Events(K)
-  for -t: U32
+  for -t: F.Time
   {F.B.switcher(~K, ~A, ~fam, k, e)(t) == fam(F.B.stepper(K, k, e)(t))(t) : A}
 
 # par: each half of its output is that machine alone
@@ -298,7 +298,7 @@ law e_snapshot_occ:
   for ~C: Data
   for ~f: A -> B -> C
   for ~b: F.Behavior(B)
-  for -t: U32
+  for -t: F.Time
   for -a: A
   for -e: F.Events(A)
   {F.E.snapshot(~A, ~B, ~C, ~f, ~b, F.Occ{t, a} <> e) == F.Occ{t, f(a, b(t))} <> F.E.snapshot(~A, ~B, ~C, ~f, ~b, e) : F.Events(C)}

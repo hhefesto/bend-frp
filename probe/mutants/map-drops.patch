@@ -1,6 +1,6 @@
 --- a/Frp.bend
 +++ b/Frp.bend
-@@ -57,7 +57,7 @@
+@@ -90,7 +90,7 @@
      case Nil{}:
        Nil{}
      case Con{o, rest}:

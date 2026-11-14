@@ -37,8 +37,19 @@ export function mount(App, root, host = (globalThis.bendFrp ??= {})) {
   const queue = [];
   let busy = false;
 
+  // An input's time, as Frp.bend's Time holds it (whole seconds, and the
+  // fraction in 2^-32 s), and always after the last one: no two inputs share
+  // a time.
+  let last = -1n;
+  const stamp = () => {
+    let t = BigInt(Math.floor(performance.now() * 4294967.296));
+    if (t <= last) t = last + 1n;
+    last = t;
+    return { $: "Time", sec: Number(t >> 32n), frac: Number(t & 0xffffffffn) };
+  };
+
   const fire = (tag, value) => {
-    queue.push({ $: "Input", at: Math.floor(performance.now()) >>> 0, tag, value });
+    queue.push({ $: "Input", at: stamp(), tag, value });
     if (busy) return;
     busy = true;
     try {
@@ -71,7 +82,7 @@ export function mount(App, root, host = (globalThis.bendFrp ??= {})) {
       document.getElementById(fx.id)?.focus();
     } else if (fx.$ === "Host") {
       const a = host[fx.name]?.(fx.arg, (v) => fire(fx.tag, String(v)));
-      if (typeof a === "string") queue.push({ $: "Input", at: 0, tag: fx.tag, value: a });
+      if (typeof a === "string") queue.push({ $: "Input", at: stamp(), tag: fx.tag, value: a });
     }
   };
 

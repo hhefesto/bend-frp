@@ -1,6 +1,6 @@
 --- a/Frp.bend
 +++ b/Frp.bend
-@@ -256,7 +256,7 @@
+@@ -289,7 +289,7 @@
  
  def accum.step(~A: Data, ~B: Data, ~f: B -> A -> B, s: B, a: A) -> B & B:
    +n = f(s, a)

@@ -1,11 +1,11 @@
 --- a/Frp.bend
 +++ b/Frp.bend
-@@ -33,7 +33,7 @@
+@@ -66,7 +66,7 @@
    t => f(b(t))
  
  def B.ap(-A: Type, -B: Type, bf: Behavior(A -> B), bx: Behavior(A)) -> Behavior(B):
 -  +t => bf(t)(bx(t))
-+  +t => bf(0)(bx(t))
++  +t => bf(Time.secs(0))(bx(t))
  
  def ident(-A: Data, x: A) -> A:
    x

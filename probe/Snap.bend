@@ -9,8 +9,8 @@ def add(a: U32, b: U32) -> U32:
   (a + b : U32)
 
 def input() -> F.Events(F.Side<U32, U32>):
-  [F.Occ{1, F.Fire{10}}, F.Occ{2, F.Set{5}}, F.Occ{3, F.Fire{20}},
-   F.Occ{3, F.Set{7}}, F.Occ{4, F.Fire{30}}, F.Occ{6, F.Set{9}}]
+  [F.Occ{F.Time.secs(1), F.Fire{10}}, F.Occ{F.Time.secs(2), F.Set{5}}, F.Occ{F.Time.secs(3), F.Fire{20}},
+   F.Occ{F.Time.secs(3), F.Set{7}}, F.Occ{F.Time.secs(4), F.Fire{30}}, F.Occ{F.Time.secs(6), F.Set{9}}]
 
 def vals(e: F.Events(U32)) -> List<&2, U32>:
   match e:

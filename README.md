@@ -15,7 +15,8 @@ one is in `examples/todo`.
 
 ## The meaning
 
-- `Time` is dense: between any two moments there is another.
+- `Time` means a real number of seconds: dense, so between any two moments
+  there is another (see "Time" below for how it is held).
 - `Behavior<A>` means a function `Time -> A`.
 - `Event<A>` means a list of occurrences `(Time, A)` in time order.
 
@@ -48,6 +49,45 @@ What bend-frp leaves out, on purpose:
 - **Frames and ticks in the interface.** Sampling is the renderer's
   business: a view is sampled when an input arrives, and on display frames
   only while it depends on `B.time`.
+
+## Time
+
+Elliott's time is the reals, and his implementations held it as a `Double`
+(`type Time = Double` in Fran; `TimeT = Double` in Reactive, whose events and
+behaviors take any ordered time type). A `Double` is not continuous, yet it did
+the job, for four reasons:
+
+1. **The meaning is over the reals, and programs are written against the
+   meaning.** No operation asks for "the next moment" or counts ticks: a
+   program compares times, adds durations and samples. The representation
+   shows only as rounding, as `Double` stands in for the reals in any
+   numerical code.
+2. **Sampling is chosen last.** A program says what a value is at every time;
+   the runtime decides when to look. The resolution never leaks into the
+   program, and composing (transforming time, integrating) does not amplify
+   sampling artifacts (Elliott, *Why program with continuous time?*).
+3. **Its resolution is far finer than any clock that stamps an input.** 53
+   bits of mantissa are under a microsecond for a century of seconds, so two
+   inputs never collapse into one time, and order is all an event needs.
+4. **It is a number.** `time` goes into arithmetic (`sin time`, durations,
+   scaling), and it has infinities for "never" (Reactive's `AddBounds`).
+
+bend-frp held time as `U32` milliseconds. That kept 1 and 2, but not 3 or 4:
+it wrapped after 49.7 days, two quick inputs could share a millisecond (so a
+sample could miss a value set just before it), and `B.time` was a count of
+milliseconds.
+
+Bend has no 64-bit float. `F32` (24-bit mantissa) is coarser than a
+millisecond once a page has been open 4.6 hours, and its operations are
+primitives whose laws cannot be proved. So bend-frp holds `Time` as 64-bit
+fixed-point seconds, `Time{sec, frac}`, the fraction in units of 2^-32 s.
+That meets 1 to 3: the meaning is still the reals; programs only compare
+(`Time.lt`, `Time.le`), add (`Time.add`) and sample; and it resolves 0.23 ns
+for 136 years. It also orders exactly, by a plain definition, so the laws
+about time are proved rather than assumed. The runtime stamps each input with
+the clock and never gives two inputs the same time. Of 4, it has addition so
+far; scaling and a conversion to `F32` for continuous arithmetic are still to
+come. It needs no infinities: `never` is the event with no occurrences.
 
 ## Laws
 
@@ -97,8 +137,8 @@ keys, a `snapshot` that samples late, an `accum` that outputs its old state.
 Each one makes `PROOF.bend` fail.
 
 Not stated yet: `merge`'s associativity, and that the operations keep events
-in time order. Both need the order of times as lemmas over `U32` (Base's `U32`
-is a 32-bit word with an inductive compare, so they can be proved).
+in time order. Both need the order of times as lemmas over `Time` (a pair of
+Base's `U32`, 32-bit words with an inductive compare, so they can be proved).
 
 ## Building
 

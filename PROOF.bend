@@ -94,7 +94,7 @@ law then.l2:
   for ~C: Data
   for ~sa: S -> A -> S & B
   for ~sb: T -> B -> T & C
-  for -u: U32
+  for -u: F.Time
   for -rest: F.Events(A)
   for -s2: S
   for q: T & C
@@ -120,7 +120,7 @@ law then.l1:
   for ~C: Data
   for ~sa: S -> A -> S & B
   for ~sb: T -> B -> T & C
-  for -u: U32
+  for -u: F.Time
   for -rest: F.Events(A)
   for t: T
   for p: S & B
@@ -148,7 +148,7 @@ def Laws.e_run_then(S, T, A, B, C, sa, sb, e, s, t):
 law each.done.flat:
   for -T: Data
   for -C: Data
-  for -u: U32
+  for -u: F.Time
   for -y: C
   for r: T & List<&2, C>
   for -k: T -> F.Events(List<&2, C>)
@@ -165,7 +165,7 @@ law each.push.flat:
   for ~B: Data
   for ~C: Data
   for ~sb: T -> B -> T & C
-  for -u: U32
+  for -u: F.Time
   for more: List<&2, B>
   for -tail: F.Events(B)
   for -k: T -> F.Events(List<&2, C>)
@@ -193,7 +193,7 @@ law each.in:
   for ~B: Data
   for ~C: Data
   for ~sb: T -> B -> T & C
-  for -u: U32
+  for -u: F.Time
   for xs: List<&2, B>
   for t: T
   for -tail: F.Events(B)
@@ -312,10 +312,10 @@ def merge.later.if(A, b, x, xs, y, ys, h):
                == y <> F.E.merge(A, x <> xs, ys) : F.Events(A)}, h)
 
 def Laws.e_merge_first(A, t, a, xs, u, b, ys, h):
-  merge.first.if(A, U32.is_lt(u, t), F.Occ{t, a}, xs, F.Occ{u, b}, ys, h)
+  merge.first.if(A, F.Time.lt(u, t), F.Occ{t, a}, xs, F.Occ{u, b}, ys, h)
 
 def Laws.e_merge_later(A, t, a, xs, u, b, ys, h):
-  merge.later.if(A, U32.is_lt(u, t), F.Occ{t, a}, xs, F.Occ{u, b}, ys, h)
+  merge.later.if(A, F.Time.lt(u, t), F.Occ{t, a}, xs, F.Occ{u, b}, ys, h)
 
 # filter at one occurrence, once whether its value passes is known.
 law keep.hit:
@@ -383,7 +383,7 @@ def Laws.stepper_after(A, e, t, x, all):
     case Con{o, rest}:
       match o:
         case F.Occ{u, y}:
-          stepper.if(A, x, F.B.stepper.at(A, rest, t, y), F.E.last(A, rest, y), U32.is_lt(u, t),
+          stepper.if(A, x, F.B.stepper.at(A, rest, t, y), F.E.last(A, rest, y), F.Time.lt(u, t),
                      F.E.all_before(A, rest, t), all, h => Laws.stepper_after(A, rest, t, y, h))
 
 # par, snapshot and switch
@@ -399,7 +399,7 @@ law par.fst.l2:
   for ~C: Data
   for ~sa: S -> A -> S & B
   for ~sb: T -> A -> T & C
-  for -u: U32
+  for -u: F.Time
   for -rest: F.Events(A)
   for -s2: S
   for -y: B
@@ -429,7 +429,7 @@ law par.fst.l1:
   for ~C: Data
   for ~sa: S -> A -> S & B
   for ~sb: T -> A -> T & C
-  for -u: U32
+  for -u: F.Time
   for -rest: F.Events(A)
   for t: T
   for x: A
@@ -467,7 +467,7 @@ law par.snd.l2:
   for ~C: Data
   for ~sa: S -> A -> S & B
   for ~sb: T -> A -> T & C
-  for -u: U32
+  for -u: F.Time
   for -rest: F.Events(A)
   for -s2: S
   for -y: B
@@ -497,7 +497,7 @@ law par.snd.l1:
   for ~C: Data
   for ~sa: S -> A -> S & B
   for ~sb: T -> A -> T & C
-  for -u: U32
+  for -u: F.Time
   for -rest: F.Events(A)
   for t: T
   for x: A
@@ -577,7 +577,7 @@ def snap.stay.if(A, x, X, b, c, h):
 law snap.stay:
   for -B: Data
   for d: F.Events(B)
-  for +t: U32
+  for +t: F.Time
   for -x: B
   for h: {F.E.none_before(B, d, t) == True{} : Bool}
   {F.B.stepper.at(B, d, t, x) == x : B}
@@ -589,7 +589,7 @@ def snap.stay(B, d, t, x, h):
     case Con{o, +rest}:
       match o:
         case F.Occ{+u, y}:
-          snap.stay.if(B, x, F.B.stepper.at(B, rest, t, y), U32.is_lt(u, t), F.E.none_before(B, rest, t), h)
+          snap.stay.if(B, x, F.B.stepper.at(B, rest, t, y), F.Time.lt(u, t), F.E.none_before(B, rest, t), h)
 
 # A value set before every sample is the stepper's value at each of them.
 law snap.shift.if:
@@ -597,7 +597,7 @@ law snap.shift.if:
   for ~B: Data
   for ~C: Data
   for ~f: A -> B -> C
-  for -t: U32
+  for -t: F.Time
   for -a: A
   for -s: B
   for -X: B
@@ -622,7 +622,7 @@ law snap.shift:
   for ~C: Data
   for ~f: A -> B -> C
   for fs: F.Events(A)
-  for +u: U32
+  for +u: F.Time
   for -s: B
   for -v: B
   for -ds: F.Events(B)
@@ -639,7 +639,7 @@ def snap.shift(A, B, C, f, fs, u, s, v, ds, h):
           snap.shift.if(A, B, C, f, t, a, s, F.B.stepper.at(B, ds, t, v),
                         F.E.snapshot.stepper(~A, ~B, ~C, ~f, rest, s, F.Occ{u, v} <> ds),
                         F.E.snapshot.stepper(~A, ~B, ~C, ~f, rest, v, ds),
-                        U32.is_lt(u, t), F.E.all_after(A, rest, u), h,
+                        F.Time.lt(u, t), F.E.all_after(A, rest, u), h,
                         h2 => snap.shift(A, B, C, f, rest, u, s, v, ds, h2))
 
 def Laws.e_run_snap(A, B, C, f, i, x, ok):
@@ -696,7 +696,7 @@ law switch.fire:
   for ~B: Data
   for ~init: K -> S
   for ~step: K -> S -> A -> S & B
-  for -t: U32
+  for -t: F.Time
   for -rest: F.Events(F.Side<A, K>)
   for -k: K
   for p: S & B
@@ -773,7 +773,7 @@ law stepper.before.if:
   for -A: Data
   for -x: A
   for -y: A
-  for -u: U32
+  for -u: F.Time
   for -X: A
   for -R: F.Events(A)
   for b: Bool
@@ -794,5 +794,5 @@ def Laws.stepper_before(A, e, t, x):
     case Con{o, rest}:
       match o:
         case F.Occ{u, y}:
-          stepper.before.if(A, x, y, u, F.B.stepper.at(A, rest, t, y), F.E.before(A, rest, t), U32.is_lt(u, t),
+          stepper.before.if(A, x, y, u, F.B.stepper.at(A, rest, t, y), F.E.before(A, rest, t), F.Time.lt(u, t),
                             Laws.stepper_before(A, rest, t, y))

@@ -1,11 +1,11 @@
 --- a/Frp.bend
 +++ b/Frp.bend
-@@ -50,7 +50,7 @@
+@@ -83,7 +83,7 @@
  def Occ.map(~A: Data, ~B: Data, ~f: A -> B, o: Occ<A>) -> Occ<B>:
    match o:
      case Occ{t, x}:
 -      Occ{t, f(x)}
-+      Occ{U32.inc(t), f(x)}
++      Occ{Time.add(t, Time{0, 1}), f(x)}
  
  def E.map(~A: Data, ~B: Data, ~f: A -> B, e: Events(A)) -> Events(B):
    match e:
