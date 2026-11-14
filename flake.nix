@@ -23,7 +23,6 @@
           ./Frp.bend
           ./LAWS.bend
           ./PROOF.bend
-          ./PROPOSED.bend
           ./Web.bend
           ./runtime.js
           ./probe

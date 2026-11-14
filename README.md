@@ -62,11 +62,7 @@ ALL PROOFS CHECK when every law holds; `--verdict` rechecks with BendTT's kernel
   `E.accum`; `then` is composition (`E.run` of `then(a, b)` is `b` over `a`'s
   outputs, the morphism of the category of machines into functions on events);
   `each` over an event is the machine over the event spread;
-- `stepper` sampled after all of an event is its last value.
-
-Proposed (`PROPOSED.bend`): proved like the rest, waiting for the human to move
-them into `LAWS.bend` (or reword or drop them):
-
+- `stepper` sampled after all of an event is its last value;
 - `par`: each half of its output is that machine alone (`E.run` of `par`,
   mapped through `Both.fst` or `Both.snd`);
 - `E.snapshot` at `B.stepper(x, d)` is `E.snapshot.stepper(f, e, x, d)`;

@@ -4,7 +4,6 @@
 import Base
 import ./Frp.bend as F
 import ./LAWS.bend as Laws
-import ./PROPOSED.bend as Proposed
 
 law cons_cong:
   for -A: Data
@@ -281,8 +280,8 @@ def Laws.stepper_after(A, e, t, x, all):
           stepper.if(A, x, F.B.stepper.at(A, rest, t, y), F.E.last(A, rest, y), U32.is_lt(u, t),
                      F.E.all_before(A, rest, t), all, h => Laws.stepper_after(A, rest, t, y, h))
 
-# The proposed laws (PROPOSED.bend)
-# ---------------------------------
+# par, snapshot and switch
+# -------------------------
 
 # par: the first half
 
@@ -342,7 +341,7 @@ def par.fst.l1(S, T, A, B, C, sa, sb, u, rest, t, x, p, ih):
     case (s2, y):
       par.fst.l2(S, T, A, B, C, sa, sb, u, rest, s2, y, sb(t, x), ih(s2))
 
-def Proposed.e_run_par_fst(S, T, A, B, C, sa, sb, e, s, t):
+def Laws.e_run_par_fst(S, T, A, B, C, sa, sb, e, s, t):
   match e:
     case Nil{}:
       {==}
@@ -350,7 +349,7 @@ def Proposed.e_run_par_fst(S, T, A, B, C, sa, sb, e, s, t):
       match o:
         case F.Occ{u, +x}:
           par.fst.l1(S, T, A, B, C, sa, sb, u, rest, t, x, sa(s, x),
-                     s2 => t2 => Proposed.e_run_par_fst(S, T, A, B, C, sa, sb, rest, s2, t2))
+                     s2 => t2 => Laws.e_run_par_fst(S, T, A, B, C, sa, sb, rest, s2, t2))
 
 # par: the second half
 
@@ -410,7 +409,7 @@ def par.snd.l1(S, T, A, B, C, sa, sb, u, rest, t, x, p, ih):
     case (s2, y):
       par.snd.l2(S, T, A, B, C, sa, sb, u, rest, s2, y, sb(t, x), ih(s2))
 
-def Proposed.e_run_par_snd(S, T, A, B, C, sa, sb, e, s, t):
+def Laws.e_run_par_snd(S, T, A, B, C, sa, sb, e, s, t):
   match e:
     case Nil{}:
       {==}
@@ -418,11 +417,11 @@ def Proposed.e_run_par_snd(S, T, A, B, C, sa, sb, e, s, t):
       match o:
         case F.Occ{u, +x}:
           par.snd.l1(S, T, A, B, C, sa, sb, u, rest, t, x, sa(s, x),
-                     s2 => t2 => Proposed.e_run_par_snd(S, T, A, B, C, sa, sb, rest, s2, t2))
+                     s2 => t2 => Laws.e_run_par_snd(S, T, A, B, C, sa, sb, rest, s2, t2))
 
 # snapshot: the data form
 
-def Proposed.snapshot_stepper(A, B, C, f, x, d, e):
+def Laws.snapshot_stepper(A, B, C, f, x, d, e):
   match e:
     case Nil{}:
       {==}
@@ -432,7 +431,7 @@ def Proposed.snapshot_stepper(A, B, C, f, x, d, e):
           cons_cong(F.Occ<C>, F.Occ{t, f(a, F.B.stepper.at(B, d, t, x))},
                     F.E.snapshot(~A, ~B, ~C, ~f, ~F.B.stepper(B, x, d), rest),
                     F.E.snapshot.stepper(~A, ~B, ~C, ~f, rest, x, d),
-                    Proposed.snapshot_stepper(A, B, C, f, x, d, rest))
+                    Laws.snapshot_stepper(A, B, C, f, x, d, rest))
 
 # snapshot: the machine
 
@@ -537,7 +536,7 @@ def snap.shift(A, B, C, f, fs, u, s, v, ds, h):
                         U32.is_lt(u, t), F.E.all_after(A, rest, u), h,
                         h2 => snap.shift(A, B, C, f, rest, u, s, v, ds, h2))
 
-def Proposed.e_run_snap(A, B, C, f, i, x, ok):
+def Laws.e_run_snap(A, B, C, f, i, x, ok):
   match i:
     case Nil{}:
       {==}
@@ -560,7 +559,7 @@ def Proposed.e_run_snap(A, B, C, f, i, x, ok):
                     cons_cong(F.Occ<C>, F.Occ{t, f(a, x)},
                       F.E.justs(C, F.E.run(~B, ~F.Side<A, B>, ~Maybe<&2, C>, ~(+s => i => F.snap.step(~A, ~B, ~C, ~f, s, i)), rest, x)),
                       F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.E.sets(A, B, rest)),
-                      Proposed.e_run_snap(A, B, C, f, rest, x, h2)),
+                      Laws.e_run_snap(A, B, C, f, rest, x, h2)),
                     Equal.cong(B, F.Events(C),
                       y => F.Occ{t, f(a, y)} <> F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.E.sets(A, B, rest)),
                       x, F.B.stepper.at(B, F.E.sets(A, B, rest), t, x),
@@ -576,7 +575,7 @@ def Proposed.e_run_snap(A, B, C, f, i, x, ok):
                     F.E.justs(C, F.E.run(~B, ~F.Side<A, B>, ~Maybe<&2, C>, ~(+s => i => F.snap.step(~A, ~B, ~C, ~f, s, i)), rest, v)),
                     F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), v, F.E.sets(A, B, rest)),
                     F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.Occ{t, v} <> F.E.sets(A, B, rest)),
-                    Proposed.e_run_snap(A, B, C, f, rest, v, h2),
+                    Laws.e_run_snap(A, B, C, f, rest, v, h2),
                     Equal.sym(F.Events(C),
                       F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), x, F.Occ{t, v} <> F.E.sets(A, B, rest)),
                       F.E.snapshot.stepper(~A, ~B, ~C, ~f, F.E.fires(A, B, rest), v, F.E.sets(A, B, rest)),
@@ -615,7 +614,7 @@ def switch.fire(K, S, A, B, init, step, t, rest, k, p, ih):
                 F.E.switched(~K, ~S, ~A, ~B, ~init, ~step, rest, k, s2),
                 ih(s2))
 
-def Proposed.e_run_switch(K, S, A, B, init, step, i, k, s):
+def Laws.e_run_switch(K, S, A, B, init, step, i, k, s):
   match i:
     case Nil{}:
       {==}
@@ -625,6 +624,6 @@ def Proposed.e_run_switch(K, S, A, B, init, step, i, k, s):
           match x:
             case F.Fire{a}:
               switch.fire(K, S, A, B, init, step, t, rest, k, step(k, s, a),
-                          s2 => Proposed.e_run_switch(K, S, A, B, init, step, rest, k, s2))
+                          s2 => Laws.e_run_switch(K, S, A, B, init, step, rest, k, s2))
             case F.Set{+k2}:
-              Proposed.e_run_switch(K, S, A, B, init, step, rest, k2, init(k2))
+              Laws.e_run_switch(K, S, A, B, init, step, rest, k2, init(k2))
