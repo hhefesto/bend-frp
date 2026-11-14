@@ -32,6 +32,47 @@ law b_ap_pure:
   for -t: U32
   {F.B.ap(A, B, F.B.pure(A -> B, f), F.B.pure(A, x))(t) == f(x) : B}
 
+
+# The rest of Elliott's applicative laws for behaviors (b_ap_pure above is the
+# homomorphism law), map as pure-then-ap, and time's meaning. A behavior means
+# a function of time, so each holds pointwise, at every t.
+law b_ap_id:
+  for -A: Data
+  for -v: F.Behavior(A)
+  for -t: U32
+  {F.B.ap(A, A, F.B.pure(A -> A, x => x), v)(t) == v(t) : A}
+
+law b_ap_comp:
+  for -A: Data
+  for -B: Data
+  for -C: Data
+  for -u: F.Behavior(B -> C)
+  for -v: F.Behavior(A -> B)
+  for -w: F.Behavior(A)
+  for -t: U32
+  {F.B.ap(A, C, F.B.ap(A -> B, A -> C, F.B.ap(B -> C, (A -> B) -> A -> C,
+       F.B.pure((B -> C) -> (A -> B) -> A -> C, g => f => x => g(f(x))), u), v), w)(t)
+     == F.B.ap(B, C, u, F.B.ap(A, B, v, w))(t) : C}
+
+law b_ap_interchange:
+  for -A: Data
+  for -B: Data
+  for -u: F.Behavior(A -> B)
+  for -y: A
+  for -t: U32
+  {F.B.ap(A, B, u, F.B.pure(A, y))(t) == F.B.ap(A -> B, B, F.B.pure((A -> B) -> B, f => f(y)), u)(t) : B}
+
+law b_map_ap:
+  for -A: Data
+  for -B: Data
+  for -f: A -> B
+  for -b: F.Behavior(A)
+  for -t: U32
+  {F.B.map(A, B, f, b)(t) == F.B.ap(A, B, F.B.pure(A -> B, f), b)(t) : B}
+
+law b_time:
+  for -t: U32
+  {F.B.time()(t) == t : U32}
 # Events
 # ------
 
@@ -49,6 +90,23 @@ law e_map_comp:
   for e: F.Events(A)
   {F.E.map(~B, ~C, ~g, F.E.map(~A, ~B, ~f, e)) == F.E.map(~A, ~C, ~F.comp(~A, ~B, ~C, ~f, ~g), e) : F.Events(C)}
 
+# map's meaning (Elliott's): each occurrence keeps its time, its value goes
+# through f. These two pin map down, by induction on the event.
+law e_map_never:
+  for ~A: Data
+  for ~B: Data
+  for ~f: A -> B
+  {F.E.map(~A, ~B, ~f, F.E.never(A)) == F.E.never(B) : F.Events(B)}
+
+law e_map_occ:
+  for ~A: Data
+  for ~B: Data
+  for ~f: A -> B
+  for -t: U32
+  for -a: A
+  for -e: F.Events(A)
+  {F.E.map(~A, ~B, ~f, F.Occ{t, a} <> e) == F.Occ{t, f(a)} <> F.E.map(~A, ~B, ~f, e) : F.Events(B)}
+
 law e_filter_all:
   for ~A: Data
   for e: F.Events(A)
@@ -63,6 +121,56 @@ law e_merge_never_r:
   for -A: Data
   for e: F.Events(A)
   {F.E.merge(A, e, F.E.never(A)) == e : F.Events(A)}
+
+# merge is Elliott's: of two first occurrences the earlier goes first, e1's at
+# equal times. With never on either side (above), these pin merge down: any
+# two events have one merge, by induction on both.
+law e_merge_first:
+  for -A: Data
+  for +t: U32
+  for -a: A
+  for -xs: F.Events(A)
+  for +u: U32
+  for -b: A
+  for -ys: F.Events(A)
+  for h: {U32.is_lt(u, t) == False{} : Bool}
+  {F.E.merge(A, F.Occ{t, a} <> xs, F.Occ{u, b} <> ys) == F.Occ{t, a} <> F.E.merge(A, xs, F.Occ{u, b} <> ys) : F.Events(A)}
+
+law e_merge_later:
+  for -A: Data
+  for +t: U32
+  for -a: A
+  for -xs: F.Events(A)
+  for +u: U32
+  for -b: A
+  for -ys: F.Events(A)
+  for h: {U32.is_lt(u, t) == True{} : Bool}
+  {F.E.merge(A, F.Occ{t, a} <> xs, F.Occ{u, b} <> ys) == F.Occ{u, b} <> F.E.merge(A, F.Occ{t, a} <> xs, ys) : F.Events(A)}
+
+# filter keeps exactly the occurrences whose value passes p, at their times,
+# in their order. These three pin filter down, by induction on the event.
+law e_filter_never:
+  for ~A: Data
+  for ~p: A -> Bool
+  {F.E.filter(~A, ~p, F.E.never(A)) == F.E.never(A) : F.Events(A)}
+
+law e_filter_keep:
+  for ~A: Data
+  for ~p: A -> Bool
+  for -t: U32
+  for a: A
+  for -e: F.Events(A)
+  for h: {p(a) == True{} : Bool}
+  {F.E.filter(~A, ~p, F.Occ{t, a} <> e) == F.Occ{t, a} <> F.E.filter(~A, ~p, e) : F.Events(A)}
+
+law e_filter_drop:
+  for ~A: Data
+  for ~p: A -> Bool
+  for -t: U32
+  for a: A
+  for -e: F.Events(A)
+  for h: {p(a) == False{} : Bool}
+  {F.E.filter(~A, ~p, F.Occ{t, a} <> e) == F.E.filter(~A, ~p, e) : F.Events(A)}
 
 # Machines agree with the meaning
 # -------------------------------
@@ -118,6 +226,26 @@ law stepper_after:
   for all: {F.E.all_before(A, e, t) == True{} : Bool}
   {F.B.stepper(A, x, e)(t) == F.E.last(A, e, x) : A}
 
+# stepper's meaning (Elliott's): at t, the value of the last occurrence
+# strictly before t, or x when there is none.
+law stepper_before:
+  for -A: Data
+  for e: F.Events(A)
+  for +t: U32
+  for -x: A
+  {F.B.stepper(A, x, e)(t) == F.E.last(A, F.E.before(A, e, t), x) : A}
+
+# switcher's meaning: at t, the family's behavior for the key the keys'
+# stepper holds at t, sampled at t.
+law switcher_stepper:
+  for ~K: Data
+  for ~A: Data
+  for ~fam: K -> F.Behavior(A)
+  for -k: K
+  for -e: F.Events(K)
+  for -t: U32
+  {F.B.switcher(~K, ~A, ~fam, k, e)(t) == fam(F.B.stepper(K, k, e)(t))(t) : A}
+
 # par: each half of its output is that machine alone
 # -------------------------------------------------
 
@@ -153,6 +281,27 @@ law e_run_par_snd:
 
 # snapshot
 # --------
+
+# snapshot's meaning (Elliott's): each occurrence keeps its time and pairs its
+# value with the behavior's at that time. These two pin snapshot down.
+law e_snapshot_never:
+  for ~A: Data
+  for ~B: Data
+  for ~C: Data
+  for ~f: A -> B -> C
+  for ~b: F.Behavior(B)
+  {F.E.snapshot(~A, ~B, ~C, ~f, ~b, F.E.never(A)) == F.E.never(C) : F.Events(C)}
+
+law e_snapshot_occ:
+  for ~A: Data
+  for ~B: Data
+  for ~C: Data
+  for ~f: A -> B -> C
+  for ~b: F.Behavior(B)
+  for -t: U32
+  for -a: A
+  for -e: F.Events(A)
+  {F.E.snapshot(~A, ~B, ~C, ~f, ~b, F.Occ{t, a} <> e) == F.Occ{t, f(a, b(t))} <> F.E.snapshot(~A, ~B, ~C, ~f, ~b, e) : F.Events(C)}
 
 # The data form is the meaning at a stepper.
 law snapshot_stepper:

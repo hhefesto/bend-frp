@@ -92,12 +92,15 @@ def E.merge.pick(-A: Data, later: Bool, x: Occ<A>, y: Occ<A>, k: Events(A) -> Ev
     case False{}:
       x <> k(y <> ys)
 
+# The continuation is passed eta-expanded (r => j(r)): the checker expands j
+# where a law states it, and BendTT's kernel compares terms without eta, so
+# this form lets the kernel see merge's laws hold (LAWS.e_merge_first, _later).
 def E.merge.in(-A: Data, +x: Occ<A>, e2: Events(A), k: Events(A) -> Events(A)) -> Events(A):
   match e2:
     case Nil{}:
       x <> k(Nil{})
     case Con{+y, +ys}:
-      E.merge.pick(A, U32.is_lt(Occ.at(A, y), Occ.at(A, x)), x, y, k, ys, j => E.merge.in(A, x, ys, j))
+      E.merge.pick(A, U32.is_lt(Occ.at(A, y), Occ.at(A, x)), x, y, k, ys, j => E.merge.in(A, x, ys, r => j(r)))
 
 def E.merge(-A: Data, e1: Events(A), e2: Events(A)) -> Events(A):
   match e1:
@@ -143,6 +146,24 @@ def E.last(-A: Data, e: Events(A), x: A) -> A:
     case Con{o, rest}:
       E.last(A, rest, Occ.val(A, o))
 
+
+# The occurrences strictly before t. An event is in time order, so they are
+# the ones ahead of its first at or after t.
+def E.before.if(-A: Data, more: Unit -> Events(A), before: Bool) -> Events(A):
+  match before:
+    case True{}:
+      more(Unit{})
+    case False{}:
+      Nil{}
+
+def E.before(-A: Data, e: Events(A), +t: U32) -> Events(A):
+  match e:
+    case Nil{}:
+      Nil{}
+    case Con{o, rest}:
+      match o:
+        case Occ{+u, y}:
+          E.before.if(A, w => Occ{u, y} <> E.before(A, rest, t), U32.is_lt(u, t))
 # An event with any number of values at each occurrence, spread into one
 # occurrence for each.
 def E.spread(-A: Data, +t: U32, xs: List<&2, A>, rest: Events(A)) -> Events(A):

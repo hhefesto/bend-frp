@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -100,7 +100,7 @@
+     case Nil{}:
+       x <> k(Nil{})
+     case Con{+y, +ys}:
+-      E.merge.pick(A, U32.is_lt(Occ.at(A, y), Occ.at(A, x)), x, y, k, ys, j => E.merge.in(A, x, ys, r => j(r)))
++      E.merge.pick(A, U32.is_le(Occ.at(A, y), Occ.at(A, x)), x, y, k, ys, j => E.merge.in(A, x, ys, r => j(r)))
+ 
+ def E.merge(-A: Data, e1: Events(A), e2: Events(A)) -> Events(A):
+   match e1:

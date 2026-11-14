@@ -108,6 +108,11 @@
             bend probe/Switch.bend 2>&1 | tee $out
             grep -qxF "[[1, 2, 10, 19, 1, 2], [1, 2, 10, 19, 1, 2]]" $out
           '';
+          # the laws catch each mistake in probe/mutants/: PROOF.bend fails on every one
+          mutants = inSource pkgs "mutants" ''
+            bash probe/mutants.sh > $out 2>&1 || { cat $out; exit 1; }
+            cat $out
+          '';
           inherit (self.packages.${system}) todo probe;
         }
       );

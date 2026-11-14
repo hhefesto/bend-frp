@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -350,7 +350,7 @@
+     case Con{o, rest}:
+       match o:
+         case Occ{+t, a}:
+-          Occ{t, f(a, b(t))} <> E.snapshot(~A, ~B, ~C, ~f, ~b, rest)
++          Occ{t, f(a, b(U32.inc(t)))} <> E.snapshot(~A, ~B, ~C, ~f, ~b, rest)
+ 
+ # The same against B.stepper(x, d), a behavior described by data: each
+ # occurrence (t, a) as (t, f(a, B.stepper(x, d)(t))).

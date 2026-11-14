@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -464,7 +464,7 @@
+ # a closure, which an occurrence (data) cannot carry, so e carries keys into
+ # a family of behaviors.
+ def B.switcher(~K: Data, ~A: Type, ~fam: K -> Behavior(A), +k: K, +e: Events(K)) -> Behavior(A):
+-  +t => fam(B.stepper.at(K, e, t, k))(t)
++  +t => fam(k)(t)
+ 
+ # A family of machines over one state type: machine k starts from init(k)
+ # and steps by step(k). Its running form holds its key beside its state,

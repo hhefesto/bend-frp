@@ -54,15 +54,27 @@ What bend-frp leaves out, on purpose:
 `LAWS.bend` states the laws; `PROOF.bend` proves them (`bend PROOF.bend` prints
 ALL PROOFS CHECK when every law holds; `--verdict` rechecks with BendTT's kernel):
 
-- behaviors: `map` keeps identity and composes, `ap` of two `pure`s is the
-  function's value;
-- events: `map` keeps identity and composes, a filter that keeps all is the event,
-  `never` is `merge`'s identity on both sides;
+- behaviors, Elliott's type class morphisms (each pointwise, at every `t`):
+  `map` keeps identity and composes; `ap`'s four applicative laws (identity,
+  composition, homomorphism, interchange); `map(f, b)` is `ap(pure(f), b)`;
+  `time` at `t` is `t`;
+- events: `map` keeps identity and composes; the meanings of `map` (each
+  occurrence keeps its time, its value goes through `f`), `filter` (exactly the
+  occurrences whose value passes, in place) and `merge` (of two first
+  occurrences the earlier goes first, `e1`'s at equal times), each stated
+  occurrence by occurrence, so that with `never` (`merge`'s identity on both
+  sides) they pin the operation down;
+- `stepper` at `t` is the value of the last occurrence strictly before `t`, or
+  its first value when there is none; sampled after all of an event it is the
+  event's last value;
+- `switcher` at `t` is the family's behavior for the key the keys' stepper
+  holds at `t`;
+- `snapshot`: each occurrence keeps its time and pairs its value with the
+  behavior's at that time;
 - machines agree with the meaning: `E.run` of `lift` is `E.map`, of `accum` is
   `E.accum`; `then` is composition (`E.run` of `then(a, b)` is `b` over `a`'s
   outputs, the morphism of the category of machines into functions on events);
   `each` over an event is the machine over the event spread;
-- `stepper` sampled after all of an event is its last value;
 - `par`: each half of its output is that machine alone (`E.run` of `par`,
   mapped through `Both.fst` or `Both.snd`);
 - `E.snapshot` at `B.stepper(x, d)` is `E.snapshot.stepper(f, e, x, d)`;
@@ -76,8 +88,17 @@ ALL PROOFS CHECK when every law holds; `--verdict` rechecks with BendTT's kernel
   time-ordered events merged, samples first at equal times), the samples it
   answers are the samples snapshotted against the values' stepper.
 
-Not stated yet: `merge`'s associativity (it needs the order of times as lemmas
-over `U32`).
+The laws are tested by breaking `Frp.bend` on purpose, one mistake at a time
+(`probe/mutants.sh`): a `map` that drops occurrences or shifts their times, a
+`merge` that ignores time or puts `e2` first at equal times, a `filter` that
+keeps everything or inverts its test, `time` off by one, `ap` sampling its
+function at time 0, an inclusive `stepper`, a `switcher` that ignores its
+keys, a `snapshot` that samples late, an `accum` that outputs its old state.
+Each one makes `PROOF.bend` fail.
+
+Not stated yet: `merge`'s associativity, and that the operations keep events
+in time order. Both need the order of times as lemmas over `U32` (Base's `U32`
+is a 32-bit word with an inductive compare, so they can be proved).
 
 ## Building
 

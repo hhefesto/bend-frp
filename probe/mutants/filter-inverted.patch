@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -76,7 +76,7 @@
+     case Nil{}:
+       Nil{}
+     case Con{+o, rest}:
+-      E.keep(A, o, E.filter(~A, ~p, rest), p(Occ.val(A, o)))
++      E.keep(A, o, E.filter(~A, ~p, rest), Bool.not(p(Occ.val(A, o))))
+ 
+ def Occ.at(-A: Data, o: Occ<A>) -> U32:
+   match o:

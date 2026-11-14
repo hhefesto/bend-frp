@@ -252,6 +252,112 @@ law clash:
 def clash(G, h):
   ex_falso(G, clash.empty(h))
 
+# The same clash, the other way round.
+law clash.flip.empty:
+  for h: {True{} == False{} : Bool}
+  Empty
+
+def clash.flip.empty(h):
+  %h : disc(Bool.not(_))
+  Unit{}
+
+law clash.flip:
+  for -G: Type
+  for h: {True{} == False{} : Bool}
+  G
+
+def clash.flip(G, h):
+  ex_falso(G, clash.flip.empty(h))
+
+# merge and filter at one step
+# -----------------------------
+
+# merge at two first occurrences, once the order of their times is known.
+law merge.first.if:
+  for -A: Data
+  for b: Bool
+  for -x: F.Occ<A>
+  for -xs: F.Events(A)
+  for -y: F.Occ<A>
+  for -ys: F.Events(A)
+  for h: {b == False{} : Bool}
+  {F.E.merge.pick(A, b, x, y, r => F.E.merge(A, xs, r), ys, j => F.E.merge.in(A, x, ys, r => j(r)))
+     == x <> F.E.merge(A, xs, y <> ys) : F.Events(A)}
+
+def merge.first.if(A, b, x, xs, y, ys, h):
+  match b:
+    case True{}:
+      clash.flip({F.E.merge.pick(A, True{}, x, y, r => F.E.merge(A, xs, r), ys, j => F.E.merge.in(A, x, ys, r => j(r)))
+                    == x <> F.E.merge(A, xs, y <> ys) : F.Events(A)}, h)
+    case False{}:
+      {==}
+
+law merge.later.if:
+  for -A: Data
+  for b: Bool
+  for -x: F.Occ<A>
+  for -xs: F.Events(A)
+  for -y: F.Occ<A>
+  for -ys: F.Events(A)
+  for h: {b == True{} : Bool}
+  {F.E.merge.pick(A, b, x, y, r => F.E.merge(A, xs, r), ys, j => F.E.merge.in(A, x, ys, r => j(r)))
+     == y <> F.E.merge(A, x <> xs, ys) : F.Events(A)}
+
+def merge.later.if(A, b, x, xs, y, ys, h):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      clash({F.E.merge.pick(A, False{}, x, y, r => F.E.merge(A, xs, r), ys, j => F.E.merge.in(A, x, ys, r => j(r)))
+               == y <> F.E.merge(A, x <> xs, ys) : F.Events(A)}, h)
+
+def Laws.e_merge_first(A, t, a, xs, u, b, ys, h):
+  merge.first.if(A, U32.is_lt(u, t), F.Occ{t, a}, xs, F.Occ{u, b}, ys, h)
+
+def Laws.e_merge_later(A, t, a, xs, u, b, ys, h):
+  merge.later.if(A, U32.is_lt(u, t), F.Occ{t, a}, xs, F.Occ{u, b}, ys, h)
+
+# filter at one occurrence, once whether its value passes is known.
+law keep.hit:
+  for -A: Data
+  for -o: F.Occ<A>
+  for -rest: F.Events(A)
+  for b: Bool
+  for h: {b == True{} : Bool}
+  {F.E.keep(A, o, rest, b) == o <> rest : F.Events(A)}
+
+def keep.hit(A, o, rest, b, h):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      clash({F.E.keep(A, o, rest, False{}) == o <> rest : F.Events(A)}, h)
+
+law keep.miss:
+  for -A: Data
+  for -o: F.Occ<A>
+  for -rest: F.Events(A)
+  for b: Bool
+  for h: {b == False{} : Bool}
+  {F.E.keep(A, o, rest, b) == rest : F.Events(A)}
+
+def keep.miss(A, o, rest, b, h):
+  match b:
+    case True{}:
+      clash.flip({F.E.keep(A, o, rest, True{}) == rest : F.Events(A)}, h)
+    case False{}:
+      {==}
+
+def Laws.e_filter_never(A, p):
+  {==}
+
+def Laws.e_filter_keep(A, p, t, a, e, h):
+  keep.hit(A, F.Occ{t, a}, F.E.filter(~A, ~p, e), p(a), h)
+
+def Laws.e_filter_drop(A, p, t, a, e, h):
+  keep.miss(A, F.Occ{t, a}, F.E.filter(~A, ~p, e), p(a), h)
+
+
 law stepper.if:
   for -A: Data
   for -x: A
@@ -627,3 +733,66 @@ def Laws.e_run_switch(K, S, A, B, init, step, i, k, s):
                           s2 => Laws.e_run_switch(K, S, A, B, init, step, rest, k, s2))
             case F.Set{+k2}:
               Laws.e_run_switch(K, S, A, B, init, step, rest, k2, init(k2))
+
+# Elliott's basic laws
+# --------------------
+
+def Laws.b_ap_id(A, v, t):
+  {==}
+
+def Laws.b_ap_comp(A, B, C, u, v, w, t):
+  {==}
+
+def Laws.b_ap_interchange(A, B, u, y, t):
+  {==}
+
+def Laws.b_map_ap(A, B, f, b, t):
+  {==}
+
+def Laws.b_time(t):
+  {==}
+
+def Laws.e_map_never(A, B, f):
+  {==}
+
+def Laws.e_map_occ(A, B, f, t, a, e):
+  {==}
+
+def Laws.e_snapshot_never(A, B, C, f, b):
+  {==}
+
+def Laws.e_snapshot_occ(A, B, C, f, b, t, a, e):
+  {==}
+
+def Laws.switcher_stepper(K, A, fam, k, e, t):
+  {==}
+
+# stepper at one occurrence: before t, the stepper goes on with its value, as
+# the last of the occurrences before t does; at or after t, both stop at x.
+law stepper.before.if:
+  for -A: Data
+  for -x: A
+  for -y: A
+  for -u: U32
+  for -X: A
+  for -R: F.Events(A)
+  for b: Bool
+  for ih: {X == F.E.last(A, R, y) : A}
+  {F.B.stepper.if(A, w => X, x, b) == F.E.last(A, F.E.before.if(A, w => F.Occ{u, y} <> R, b), x) : A}
+
+def stepper.before.if(A, x, y, u, X, R, b, ih):
+  match b:
+    case True{}:
+      ih
+    case False{}:
+      {==}
+
+def Laws.stepper_before(A, e, t, x):
+  match e:
+    case Nil{}:
+      {==}
+    case Con{o, rest}:
+      match o:
+        case F.Occ{u, y}:
+          stepper.before.if(A, x, y, u, F.B.stepper.at(A, rest, t, y), F.E.before(A, rest, t), U32.is_lt(u, t),
+                            Laws.stepper_before(A, rest, t, y))

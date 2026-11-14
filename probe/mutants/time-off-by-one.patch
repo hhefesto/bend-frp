@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -27,7 +27,7 @@
+   t => x
+ 
+ def B.time() -> Behavior(U32):
+-  t => t
++  t => U32.inc(t)
+ 
+ def B.map(-A: Type, -B: Type, f: A -> B, b: Behavior(A)) -> Behavior(B):
+   t => f(b(t))

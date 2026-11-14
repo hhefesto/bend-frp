@@ -1,0 +1,11 @@
+--- a/Frp.bend
++++ b/Frp.bend
+@@ -57,7 +57,7 @@
+     case Nil{}:
+       Nil{}
+     case Con{o, rest}:
+-      Occ.map(~A, ~B, ~f, o) <> E.map(~A, ~B, ~f, rest)
++      E.map(~A, ~B, ~f, rest)
+ 
+ def E.keep(-A: Data, +o: Occ<A>, rest: Events(A), hit: Bool) -> Events(A):
+   match hit:
